@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:5173/auth/google/callback"
 
+   
+    COOKIE_DOMAIN: str = "localhost"
+    COOKIE_SECURE: bool = False  # Here i Need to Set True in production (HTTPS)
+
     # CORS
     FRONTEND_URL: str = "http://localhost:5173"
 

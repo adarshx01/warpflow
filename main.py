@@ -4,10 +4,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.database import engine, Base
+from app.rate_limit import limiter
 from app.auth.router import router as auth_router
 
 logger = logging.getLogger(__name__)
@@ -16,12 +18,10 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables on startup & fix column types
+    # Create tables on startup
+    # NOTE: Column type migrations should be handled via Alembic, not here.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await conn.execute(
-            text("ALTER TABLE users ALTER COLUMN avatar_url TYPE TEXT")
-        )
     yield
     await engine.dispose()
 
@@ -32,13 +32,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow frontend origin
+# Rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS — allow frontend origin with specific methods and headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-CSRF-Token"],
 )
 
 
