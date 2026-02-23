@@ -9,20 +9,17 @@ interface User {
   avatar_url?: string | null;
 }
 
-interface TokenResponse {
-  access_token: string;
-  token_type: string;
+interface AuthResponse {
   user: User;
 }
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  handleGoogleCallback: (code: string) => Promise<void>;
-  logout: () => void;
+  handleGoogleCallback: (code: string, state: string) => Promise<void>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -31,78 +28,72 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore session from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      setToken(storedToken);
-      api<User>('/api/auth/me', { token: storedToken })
-        .then((userData) => {
-          setUser(userData);
-        })
-        .catch(() => {
-          // Token expired or invalid
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setToken(null);
-        })
-        .finally(() => setIsLoading(false));
-    } else {
+    if (window.location.pathname === '/auth/google/callback') {
       setIsLoading(false);
+      return;
     }
+    api<User>('/api/auth/me', { skipAuthRedirect: true })
+      .then((userData) => {
+        setUser(userData);
+      })
+      .catch(() => {
+        // if No valid cookie / session expired
+        setUser(null);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
-  const persistSession = (data: TokenResponse) => {
-    setToken(data.access_token);
-    setUser(data.user);
-    localStorage.setItem('token', data.access_token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-  };
-
   const login = async (email: string, password: string) => {
-    const data = await api<TokenResponse>('/api/auth/login', {
+    const data = await api<AuthResponse>('/api/auth/login', {
       method: 'POST',
       body: { email, password },
     });
-    persistSession(data);
+    setUser(data.user);
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    const data = await api<TokenResponse>('/api/auth/register', {
+    const data = await api<AuthResponse>('/api/auth/register', {
       method: 'POST',
       body: { name, email, password },
     });
-    persistSession(data);
+    setUser(data.user);
   };
 
   const loginWithGoogle = async () => {
-    const data = await api<{ url: string }>('/api/auth/google');
+    const data = await api<{ url: string; state: string }>('/api/auth/google');
+    sessionStorage.setItem('oauth_state', data.state);
     window.location.href = data.url;
   };
 
-  const handleGoogleCallback = useCallback(async (code: string) => {
-    const data = await api<TokenResponse>('/api/auth/google/callback', {
+  const handleGoogleCallback = useCallback(async (code: string, state: string) => {
+    const savedState = sessionStorage.getItem('oauth_state');
+    sessionStorage.removeItem('oauth_state');
+    if (!state || state !== savedState) {
+      throw new Error('OAuth state mismatch. Please try again.');
+    }
+    const data = await api<AuthResponse>('/api/auth/google/callback', {
       method: 'POST',
-      body: { code },
+      body: { code, state },
     });
-    persistSession(data);
+    setUser(data.user);
   }, []);
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore errors — cookie may already be gone
+    }
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        token,
         login,
         signup,
         loginWithGoogle,

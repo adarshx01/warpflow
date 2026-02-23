@@ -16,6 +16,7 @@ export const GoogleCallback: React.FC = () => {
     calledRef.current = true;
 
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
     const errorParam = searchParams.get('error');
 
     if (errorParam) {
@@ -30,7 +31,13 @@ export const GoogleCallback: React.FC = () => {
       return;
     }
 
-    handleGoogleCallback(code)
+    if (!state) {
+      setError('Missing OAuth state parameter.');
+      setTimeout(() => navigate('/login'), 3000);
+      return;
+    }
+
+    handleGoogleCallback(code, state)
       .then(() => navigate('/workflow'))
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Google authentication failed.');
