@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Play, Trash2, ZoomIn, ZoomOut, Maximize2, Save, Download, Search, ChevronDown, Grid, Settings, Copy, LogOut } from 'lucide-react';
+import { Plus, Play, Trash2, ZoomIn, ZoomOut, Maximize2, Save, Download, Search, ChevronDown, Grid, Settings, Copy, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -102,6 +102,7 @@ const WorkflowBuilder = () => {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const { user, logout } = useAuth();
@@ -114,6 +115,44 @@ const WorkflowBuilder = () => {
     const matchesCategory = selectedCategory === 'All' || node.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const handleDragStart = (e: React.DragEvent, type: string) => {
+    e.dataTransfer.setData('application/reactflow', type);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+
+    const type = e.dataTransfer.getData('application/reactflow');
+    if (!type) return;
+
+    const nodeType = nodeTypes.find(n => n.id === type);
+    if (!nodeType) return;
+
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+
+    // Calculate position relative to the canvas, accounting for zoom and pan
+    const x = (e.clientX - canvasRect.left - pan.x * zoom) / zoom;
+    const y = (e.clientY - canvasRect.top - pan.y * zoom) / zoom;
+
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type,
+      name: nodeType.name,
+      icon: nodeType.icon,
+      color: nodeType.color,
+      position: { x, y },
+      data: {}
+    };
+    setNodes([...nodes, newNode]);
+  };
 
   const addNode = (type: string) => {
     const nodeType = nodeTypes.find(n => n.id === type);
@@ -262,12 +301,21 @@ const WorkflowBuilder = () => {
     };
   }, [isDragging, isPanning, connecting, dragStart, panStart, nodes, pan, zoom]);
 
-  const getNodePosition = (nodeId: string) => {
+  const getNodeOutputPosition = (nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return { x: 0, y: 0 };
     return { 
-      x: (node.position.x + 110) * zoom + pan.x * zoom, 
-      y: (node.position.y + 65) * zoom + pan.y * zoom 
+      x: (node.position.x + 220) * zoom + pan.x * zoom, 
+      y: (node.position.y + 111.5) * zoom + pan.y * zoom 
+    };
+  };
+
+  const getNodeInputPosition = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return { x: 0, y: 0 };
+    return { 
+      x: node.position.x * zoom + pan.x * zoom, 
+      y: (node.position.y + 111.5) * zoom + pan.y * zoom 
     };
   };
 
@@ -365,14 +413,38 @@ const WorkflowBuilder = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Sidebar Toggle Button (when closed) */}
+        {!isSidebarOpen && (
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="absolute top-6 left-6 z-30 w-11 h-11 bg-slate-800/90 backdrop-blur-xl hover:bg-slate-700/90 border border-slate-700/50 rounded-xl flex items-center justify-center transition-all shadow-lg hover:scale-105 active:scale-95"
+            title="Open Node Library"
+          >
+            <PanelLeftOpen className="w-5 h-5 text-slate-300" />
+          </button>
+        )}
+
         {/* Sidebar */}
-        <div className="w-80 bg-gradient-to-b from-slate-900/50 via-slate-900/30 to-slate-900/50 backdrop-blur-xl border-r border-slate-700/50 flex flex-col shadow-2xl">
-          <div className="p-6 border-b border-slate-700/50">
-            <h2 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider flex items-center gap-2">
-              <Grid className="w-4 h-4 text-cyan-400" />
-              Node Library
-            </h2>
+        <div 
+          className={`bg-gradient-to-b from-slate-900/50 via-slate-900/30 to-slate-900/50 backdrop-blur-xl border-r border-slate-700/50 flex flex-col shadow-2xl transition-all duration-300 ease-in-out z-20 ${
+            isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0 overflow-hidden'
+          }`}
+        >
+          <div className="p-6 border-b border-slate-700/50 flex-shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <Grid className="w-4 h-4 text-cyan-400" />
+                Node Library
+              </h2>
+              <button 
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+                title="Close Sidebar"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            </div>
             
             {/* Search */}
             <div className="relative mb-4">
@@ -414,10 +486,11 @@ const WorkflowBuilder = () => {
                   </h3>
                   <div className="space-y-2">
                     {categoryNodes.map(node => (
-                      <button
+                      <div
                         key={node.id}
-                        onClick={() => addNode(node.id)}
-                        className="w-full p-3.5 bg-gradient-to-br from-slate-800/80 to-slate-800/40 hover:from-slate-700/80 hover:to-slate-700/40 border border-slate-700/50 hover:border-slate-600/80 rounded-xl flex items-center gap-3.5 transition-all group hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, node.id)}
+                        className="w-full p-3.5 bg-gradient-to-br from-slate-800/80 to-slate-800/40 hover:from-slate-700/80 hover:to-slate-700/40 border border-slate-700/50 hover:border-slate-600/80 rounded-xl flex items-center gap-3.5 transition-all group hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl cursor-grab active:cursor-grabbing"
                       >
                         <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${node.color} flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-lg ring-2 ring-white/10`}>
                           {node.icon}
@@ -426,8 +499,14 @@ const WorkflowBuilder = () => {
                           <span className="text-sm font-semibold text-slate-100 block">{node.name}</span>
                           <span className="text-xs text-slate-500">{node.category}</span>
                         </div>
-                        <Plus className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 transition-colors" />
-                      </button>
+                        <button 
+                          onClick={() => addNode(node.id)}
+                          className="p-1.5 hover:bg-slate-600/50 rounded-lg transition-colors"
+                          title="Add to canvas"
+                        >
+                          <Plus className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 transition-colors" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -468,6 +547,8 @@ const WorkflowBuilder = () => {
             className="w-full h-full cursor-move"
             onWheel={handleWheel}
             onMouseDown={startPan}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
             style={{
               backgroundImage: `radial-gradient(circle, rgba(100, 116, 139, 0.15) 1px, transparent 1px)`,
               backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
@@ -492,8 +573,8 @@ const WorkflowBuilder = () => {
               
               {/* Existing connections */}
               {connections.map(conn => {
-                const from = getNodePosition(conn.from);
-                const to = getNodePosition(conn.to);
+                const from = getNodeOutputPosition(conn.from);
+                const to = getNodeInputPosition(conn.to);
                 const midX = (from.x + to.x) / 2;
                 
                 return (
@@ -533,7 +614,7 @@ const WorkflowBuilder = () => {
               {connecting && (
                 <g>
                   <path
-                    d={`M ${getNodePosition(connecting).x} ${getNodePosition(connecting).y} L ${mousePosition.x} ${mousePosition.y}`}
+                    d={`M ${getNodeOutputPosition(connecting).x} ${getNodeOutputPosition(connecting).y} L ${mousePosition.x} ${mousePosition.y}`}
                     fill="none"
                     stroke="url(#connecting-gradient)"
                     strokeWidth="3"
@@ -542,15 +623,15 @@ const WorkflowBuilder = () => {
                     className="animate-pulse"
                   />
                   <circle
-                    cx={getNodePosition(connecting).x}
-                    cy={getNodePosition(connecting).y}
+                    cx={getNodeOutputPosition(connecting).x}
+                    cy={getNodeOutputPosition(connecting).y}
                     r="6"
                     fill="#06b6d4"
                     className="animate-ping"
                   />
                   <circle
-                    cx={getNodePosition(connecting).x}
-                    cy={getNodePosition(connecting).y}
+                    cx={getNodeOutputPosition(connecting).x}
+                    cy={getNodeOutputPosition(connecting).y}
                     r="6"
                     fill="#06b6d4"
                   />
@@ -686,7 +767,7 @@ const WorkflowBuilder = () => {
                         startConnection(node.id, e);
                       }}
                       onMouseUp={(e) => endConnection(node.id, e)}
-                      className="node-control absolute -right-4 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-500 border-4 border-slate-900 rounded-full flex items-center justify-center hover:scale-125 transition-all shadow-xl shadow-cyan-500/30 cursor-pointer z-30 hover:rotate-90"
+                      className="node-control absolute -right-4 top-[111.5px] transform -translate-y-1/2 w-8 h-8 bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-500 border-4 border-slate-900 rounded-full flex items-center justify-center hover:scale-125 transition-all shadow-xl shadow-cyan-500/30 cursor-pointer z-30 hover:rotate-90"
                       title="Connect to another node"
                     >
                       <Plus className="w-5 h-5 text-white" strokeWidth={3} />
@@ -694,7 +775,7 @@ const WorkflowBuilder = () => {
 
                     <div
                       onMouseUp={(e) => endConnection(node.id, e)}
-                      className="node-control absolute -left-4 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 border-4 border-slate-900 rounded-full hover:scale-125 transition-all shadow-xl shadow-purple-500/30 z-30 flex items-center justify-center"
+                      className="node-control absolute -left-4 top-[111.5px] transform -translate-y-1/2 w-8 h-8 bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 border-4 border-slate-900 rounded-full hover:scale-125 transition-all shadow-xl shadow-purple-500/30 z-30 flex items-center justify-center"
                       title="Connection point"
                     >
                       <div className="w-3 h-3 rounded-full bg-white"></div>

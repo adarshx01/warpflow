@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await api('/api/auth/logout', { method: 'POST' });
     } catch {
-      // Ignore errors — cookie may already be gone
+      // Ignore errors — cookie may already be gone --- need to add
     }
     setUser(null);
   };
