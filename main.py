@@ -8,9 +8,10 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
-from app.database import engine, Base
+from app.database import engine, Base, async_session
 from app.rate_limit import limiter
 from app.auth.router import router as auth_router
+from app.workflows.router import router as workflows_router, templates_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -19,11 +20,31 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create tables on startup
-    # NOTE: Column type migrations should be handled via Alembic, not here.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Seed node templates
+    await _seed_node_templates()
+
     yield
     await engine.dispose()
+
+
+async def _seed_node_templates():
+    """Insert default node templates if the table is empty."""
+    from sqlalchemy import select as sa_select
+    from app.models import NodeTemplate
+    from app.workflows.seed import NODE_TEMPLATES
+
+    async with async_session() as db:
+        result = await db.execute(sa_select(NodeTemplate).limit(1))
+        if result.first() is not None:
+            return  # already seeded
+
+        for tmpl in NODE_TEMPLATES:
+            db.add(NodeTemplate(**tmpl))
+        await db.commit()
+        logger.info("Seeded %d node templates", len(NODE_TEMPLATES))
 
 
 app = FastAPI(
@@ -58,6 +79,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Routers
 app.include_router(auth_router)
+app.include_router(workflows_router)
+app.include_router(templates_router)
 
 
 @app.get("/health")
