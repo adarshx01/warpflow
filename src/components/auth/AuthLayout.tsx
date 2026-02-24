@@ -25,7 +25,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitl
               <span className="text-white font-bold text-xl">⚡</span>
             </div>
             <span className="font-bold text-2xl bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-              AutoNode
+              Warpflow
             </span>
           </Link>
           <h1 className="text-4xl sm:text-3xl font-bold text-slate-100 mb-3 tracking-tight">{title}</h1>

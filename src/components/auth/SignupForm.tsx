@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Label } from '../ui/Label';
 import { useAuth } from '../../contexts/AuthContext';
 
-export const SignupForm: React.FC = () => {
+interface SignupFormProps {
+  onToggle?: () => void;
+}
+
+export const SignupForm: React.FC<SignupFormProps> = ({ onToggle }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -37,7 +41,7 @@ export const SignupForm: React.FC = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    
+
     try {
       await signup(formData.name, formData.email, formData.password);
       navigate('/workflow');
@@ -66,67 +70,67 @@ export const SignupForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {errors.submit && (
-        <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-xl">
+        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl backdrop-blur-sm">
           <p className="text-sm text-red-400">{errors.submit}</p>
         </div>
       )}
 
-      <div className="space-y-2.5">
-        <Label htmlFor="name">Full Name</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="signup-name">Full Name</Label>
         <Input
-          id="name"
+          id="signup-name"
           name="name"
           type="text"
           placeholder="John Doe"
           value={formData.name}
           onChange={handleChange}
         />
-        {errors.name && <p className="text-sm text-red-400 font-medium">{errors.name}</p>}
+        {errors.name && <p className="text-xs text-red-400 font-medium">{errors.name}</p>}
       </div>
 
-      <div className="space-y-2.5">
-        <Label htmlFor="email">Email Address</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="signup-email">Email</Label>
         <Input
-          id="email"
+          id="signup-email"
           name="email"
           type="email"
           placeholder="you@example.com"
           value={formData.email}
           onChange={handleChange}
         />
-        {errors.email && <p className="text-sm text-red-400 font-medium">{errors.email}</p>}
+        {errors.email && <p className="text-xs text-red-400 font-medium">{errors.email}</p>}
       </div>
 
-      <div className="space-y-2.5">
-        <Label htmlFor="password">Password</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="signup-password">Password</Label>
         <Input
-          id="password"
+          id="signup-password"
           name="password"
           type="password"
           placeholder="••••••••"
           value={formData.password}
           onChange={handleChange}
         />
-        {errors.password && <p className="text-sm text-red-400 font-medium">{errors.password}</p>}
-        <p className="text-xs text-slate-500 font-medium">At least 8 characters</p>
+        {errors.password && <p className="text-xs text-red-400 font-medium">{errors.password}</p>}
+        <p className="text-[11px] text-slate-500 font-medium">At least 8 characters</p>
       </div>
 
-      <div className="space-y-2.5">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="signup-confirmPassword">Confirm Password</Label>
         <Input
-          id="confirmPassword"
+          id="signup-confirmPassword"
           name="confirmPassword"
           type="password"
           placeholder="••••••••"
           value={formData.confirmPassword}
           onChange={handleChange}
         />
-        {errors.confirmPassword && <p className="text-sm text-red-400 font-medium">{errors.confirmPassword}</p>}
+        {errors.confirmPassword && <p className="text-xs text-red-400 font-medium">{errors.confirmPassword}</p>}
       </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full h-11 text-base">
+      <Button type="submit" disabled={isLoading} className="w-full h-11 text-sm font-semibold rounded-xl">
         {isLoading ? (
           <span className="flex items-center gap-2 justify-center">
             <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -137,17 +141,22 @@ export const SignupForm: React.FC = () => {
         )}
       </Button>
 
-      <div className="relative my-8">
+      <div className="relative my-5">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-700/50" />
+          <div className="w-full border-t border-white/[0.06]" />
         </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-3 bg-slate-900/50 text-slate-500 font-medium">Or sign up with</span>
+        <div className="relative flex justify-center text-xs">
+          <span className="px-3 bg-transparent text-slate-500 font-medium glass-divider-label">or</span>
         </div>
       </div>
 
-      <Button type="button" variant="outline" className="w-full h-11" onClick={handleGoogleSignup}>
-        <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full h-11 flex justify-center items-center rounded-xl glass-button-outline text-sm"
+        onClick={handleGoogleSignup}
+      >
+        <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
           <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -156,11 +165,15 @@ export const SignupForm: React.FC = () => {
         Continue with Google
       </Button>
 
-      <p className="text-center text-sm text-slate-400 pt-2">
-        Already have an account?{" "}
-        <Link to="/login" className="text-cyan-400 hover:text-purple-400 transition-colors font-semibold">
+      <p className="text-center text-sm text-slate-500 pt-1">
+        Already have an account?{' '}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="text-cyan-400 hover:text-cyan-300 transition-colors font-semibold"
+        >
           Sign in
-        </Link>
+        </button>
       </p>
     </form>
   );

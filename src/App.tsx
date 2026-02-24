@@ -4,8 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { GoogleCallback } from './components/auth/GoogleCallback';
 import WorkflowBuilder from './pages/WorkFlowBuilder';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
+import AuthPage from './pages/AuthPage';
 
 function App() {
   return (
@@ -13,8 +12,8 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Navigate to="/workflow" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/signup" element={<AuthPage />} />
           <Route path="/auth/google/callback" element={<GoogleCallback />} />
           <Route
             path="/workflow"

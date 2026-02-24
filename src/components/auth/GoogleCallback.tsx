@@ -46,21 +46,45 @@ export const GoogleCallback: React.FC = () => {
   }, [searchParams, handleGoogleCallback, navigate]);
 
   return (
-    <div className="min-h-screen w-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
-      {error ? (
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 mx-auto bg-red-500/20 rounded-full flex items-center justify-center">
-            <span className="text-red-400 text-xl">✕</span>
+    <div className="min-h-screen w-screen bg-[#0a0a0f] flex items-center justify-center overflow-hidden relative">
+      {/* Ambient glow blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-500/[0.05] rounded-full blur-[100px]" />
+        <div className="absolute top-1/3 left-1/3 w-[300px] h-[300px] bg-purple-500/[0.05] rounded-full blur-[80px]" />
+      </div>
+
+      <div className="glass-card rounded-3xl p-8 sm:p-10 relative overflow-hidden w-full max-w-sm mx-4 z-10">
+        {/* Subtle top highlight */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+        {error ? (
+          <div className="text-center space-y-5">
+            <div className="w-14 h-14 mx-auto bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/10">
+              <span className="text-red-400 text-2xl">✕</span>
+            </div>
+            <div className="space-y-2">
+              <p className="text-red-400 text-sm font-medium">{error}</p>
+              <p className="text-slate-500 text-xs">Redirecting to login...</p>
+            </div>
           </div>
-          <p className="text-red-400 text-sm">{error}</p>
-          <p className="text-slate-500 text-xs">Redirecting to login...</p>
-        </div>
-      ) : (
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 mx-auto border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Completing Google sign-in...</p>
-        </div>
-      )}
+        ) : (
+          <div className="text-center space-y-6">
+            <div className="relative w-16 h-16 mx-auto">
+              {/* Outer spinning ring */}
+              <div className="absolute inset-0 border-2 border-slate-700/50 rounded-full" />
+              <div className="absolute inset-0 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+              {/* Inner logo/icon */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xl">⚡</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold text-white tracking-tight">Authenticating</h2>
+              <p className="text-slate-400 text-sm">Securely signing you in...</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
