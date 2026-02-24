@@ -75,12 +75,12 @@ export const GoogleCallback: React.FC = () => {
               <div className="absolute inset-0 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
               {/* Inner logo/icon */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xl">⚡</span>
+                <img src="/warpflow-logo-small-cropped.png" alt="WarpFlow Logo" className="h-6 filter invert object-contain" />
               </div>
             </div>
             <div className="space-y-2">
               <h2 className="text-lg font-semibold text-white tracking-tight">Authenticating</h2>
-              <p className="text-slate-400 text-sm">Securely signing you in...</p>
+              <p className="text-slate-400 text-sm">Verifying user...</p>
             </div>
           </div>
         )}

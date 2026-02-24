@@ -19,21 +19,15 @@ const AuthPage: React.FC = () => {
       </div>
 
       {/* ── Left Panel: Brand + GIF ── */}
-      <div className="hidden lg:flex lg:w-[55%] xl:w-[58%] relative flex-col p-8 xl:p-12">
+      <div className="hidden lg:flex lg:w-[50%] xl:w-[55%] relative flex-col p-8 xl:p-12">
         {/* Logo */}
-        <div className="flex items-center gap-3 z-10">
-          {/* <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/25">
-            <span className="text-white font-bold text-lg">⚡</span>
-          </div>
-          <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-            WarpFlow
-          </span> */}
-          <img src="/warpflow-logo-small.png" alt="WarpFlow Logo" className="h-96 filter invert" />
+        <div className="flex items-center z-10">
+          <img src="/warpflow-logo-small.png" alt="WarpFlow Logo" className="h-16 absolute mt-[5%] filter invert object-contain" />
         </div>
 
         {/* GIF showcase */}
-        <div className="flex-1 flex items-center justify-center z-10">
-          <div className="relative w-full max-w-2xl">
+        <div className="flex-1 flex items-center justify-center z-10 mt-8">
+          <div className="relative w-full max-w-2xl xl:max-w-3xl">
             {/* Frosted glass frame around the GIF */}
             <div className="glass-card-strong rounded-2xl p-2 shadow-2xl shadow-black/40">
               <img
@@ -49,7 +43,7 @@ const AuthPage: React.FC = () => {
         </div>
 
         {/* Tagline at the bottom-left */}
-        <div className="z-10">
+        <div className="z-10 mt-8">
           <p className="text-slate-500 text-sm font-medium">
             Intelligent workflow automation — built for speed.
           </p>
@@ -57,16 +51,11 @@ const AuthPage: React.FC = () => {
       </div>
 
       {/* ── Right Panel: Auth Form ── */}
-      <div className="w-full lg:w-[45%] xl:w-[42%] flex items-center justify-center p-6 sm:p-8 relative z-10">
-        <div className="w-full max-w-md">
+      <div className="w-full lg:w-[50%] xl:w-[45%] flex items-center justify-center p-6 sm:p-8 relative z-10">
+        <div className="w-full max-w-md xl:max-w-lg">
           {/* Mobile-only logo */}
-          <div className="flex lg:hidden items-center gap-3 mb-10 justify-center">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/25">
-              <span className="text-white font-bold text-lg">⚡</span>
-            </div>
-            <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-              WarpFlow
-            </span>
+          <div className="flex lg:hidden items-center justify-center mb-10">
+            <img src="/warpflow-logo-small.png" alt="WarpFlow Logo" className="h-12 filter invert object-contain" />
           </div>
 
           {/* Frosted glass card */}

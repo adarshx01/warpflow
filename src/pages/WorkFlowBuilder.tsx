@@ -283,15 +283,16 @@ const WorkflowBuilder = () => {
         <div className="px-8 py-5 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+              {/* <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
                 <span className="text-white font-bold text-xl">⚡</span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                  AI Workflow Studio
+                  WarpFlow Builder
                 </h1>
                 <p className="text-xs text-slate-400 mt-0.5">Build intelligent automations</p>
-              </div>
+              </div> */}
+              <img src="/warpflow-logo-small-cropped.png" alt="WarpFlow Logo" className="h-10 filter invert object-contain" />
             </div>
             
             <div className="flex items-center gap-3 ml-8">
