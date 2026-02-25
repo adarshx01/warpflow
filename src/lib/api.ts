@@ -11,6 +11,13 @@ function getCsrfToken(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+// Error details that come from the Google Docs integration and are NOT session
+// expiry — they should be shown as inline errors in the UI, not cause a logout.
+const GOOGLE_CREDENTIAL_ERRORS = [
+  "google account not connected",
+  "please complete oauth flow",
+];
+
 export async function api<T = unknown>(
   path: string,
   { method = "GET", body, skipAuthRedirect = false }: RequestOptions = {}
@@ -32,10 +39,25 @@ export async function api<T = unknown>(
   });
 
   if (res.status === 401) {
-    if (!skipAuthRedirect) {
+    // Read the error body before deciding what to do.
+    const errorBody = await res.json().catch(() => ({ detail: "" }));
+    const detail: string = (errorBody.detail ?? "").toLowerCase();
+
+    // If it's a Google credential "not connected" error, surface it as a
+    // regular thrown error so the UI can show it inline. Do NOT log the user out.
+    const isGoogleCredentialError = GOOGLE_CREDENTIAL_ERRORS.some((msg) =>
+      detail.includes(msg)
+    );
+
+    if (!isGoogleCredentialError && !skipAuthRedirect) {
       window.location.href = '/login';
     }
-    throw new Error('Session expired. Please log in again.');
+
+    throw new Error(
+      isGoogleCredentialError
+        ? "Google account not connected. Click 'Re-connect Google' and complete the OAuth flow first."
+        : "Session expired. Please log in again."
+    );
   }
 
   if (!res.ok) {
@@ -45,3 +67,4 @@ export async function api<T = unknown>(
 
   return res.json();
 }
+

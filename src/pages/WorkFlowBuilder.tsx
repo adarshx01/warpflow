@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Play, Trash2, ZoomIn, ZoomOut, Maximize2, Save, Download, Search, ChevronDown, Grid, Settings, Copy, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import NodeConfigModal from '../components/NodeConfigModal';
 
 interface NodeType {
   id: string;
@@ -33,7 +34,7 @@ const nodeTypes: NodeType[] = [
   { id: 'schedule', name: 'Schedule', icon: '⏰', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Triggers' },
   { id: 'webhook', name: 'Webhook', icon: '🔗', color: 'from-cyan-400 via-teal-400 to-green-500', category: 'Triggers' },
   { id: 'email-trigger', name: 'Email Trigger', icon: '📨', color: 'from-pink-400 via-rose-400 to-red-500', category: 'Triggers' },
-  
+
   // AI & ML
   { id: 'openai', name: 'OpenAI', icon: '🧠', color: 'from-emerald-400 via-teal-400 to-cyan-500', category: 'AI & ML' },
   { id: 'anthropic', name: 'Anthropic Claude', icon: '🤖', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'AI & ML' },
@@ -41,7 +42,7 @@ const nodeTypes: NodeType[] = [
   { id: 'ai-agent', name: 'AI Agent', icon: '👾', color: 'from-purple-400 via-fuchsia-400 to-pink-500', category: 'AI & ML' },
   { id: 'text-analysis', name: 'Text Analysis', icon: '📝', color: 'from-blue-400 via-cyan-400 to-teal-500', category: 'AI & ML' },
   { id: 'image-gen', name: 'Image Generation', icon: '🎨', color: 'from-pink-400 via-purple-400 to-indigo-500', category: 'AI & ML' },
-  
+
   // Communication
   { id: 'slack', name: 'Slack', icon: '💬', color: 'from-purple-400 via-pink-400 to-rose-500', category: 'Communication' },
   { id: 'discord', name: 'Discord', icon: '🎮', color: 'from-indigo-400 via-purple-400 to-pink-500', category: 'Communication' },
@@ -49,7 +50,7 @@ const nodeTypes: NodeType[] = [
   { id: 'telegram', name: 'Telegram', icon: '✈️', color: 'from-cyan-400 via-blue-400 to-indigo-500', category: 'Communication' },
   { id: 'email', name: 'Email', icon: '📧', color: 'from-red-400 via-pink-400 to-rose-500', category: 'Communication' },
   { id: 'sms', name: 'SMS', icon: '💌', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'Communication' },
-  
+
   // Data & Storage
   { id: 'postgresql', name: 'PostgreSQL', icon: '🐘', color: 'from-blue-500 via-indigo-500 to-blue-600', category: 'Data & Storage' },
   { id: 'mongodb', name: 'MongoDB', icon: '🍃', color: 'from-green-500 via-emerald-500 to-teal-600', category: 'Data & Storage' },
@@ -58,7 +59,7 @@ const nodeTypes: NodeType[] = [
   { id: 'google-sheets', name: 'Google Sheets', icon: '📊', color: 'from-green-400 via-emerald-400 to-green-500', category: 'Data & Storage' },
   { id: 'airtable', name: 'Airtable', icon: '📋', color: 'from-yellow-400 via-orange-400 to-red-500', category: 'Data & Storage' },
   { id: 'csv', name: 'CSV', icon: '📄', color: 'from-slate-400 via-gray-400 to-zinc-500', category: 'Data & Storage' },
-  
+
   // Logic & Flow
   { id: 'if-condition', name: 'IF Condition', icon: '🔀', color: 'from-amber-400 via-orange-400 to-red-500', category: 'Logic & Flow' },
   { id: 'switch', name: 'Switch', icon: '🔄', color: 'from-purple-400 via-violet-400 to-indigo-500', category: 'Logic & Flow' },
@@ -66,14 +67,14 @@ const nodeTypes: NodeType[] = [
   { id: 'merge', name: 'Merge', icon: '🔗', color: 'from-green-400 via-teal-400 to-cyan-500', category: 'Logic & Flow' },
   { id: 'split', name: 'Split', icon: '✂️', color: 'from-pink-400 via-rose-400 to-red-500', category: 'Logic & Flow' },
   { id: 'wait', name: 'Wait', icon: '⏸️', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Logic & Flow' },
-  
+
   // Data Processing
   { id: 'transform', name: 'Transform Data', icon: '⚙️', color: 'from-teal-400 via-cyan-400 to-blue-500', category: 'Data Processing' },
   { id: 'filter', name: 'Filter', icon: '🔍', color: 'from-indigo-400 via-purple-400 to-pink-500', category: 'Data Processing' },
   { id: 'aggregate', name: 'Aggregate', icon: '📊', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'Data Processing' },
   { id: 'sort', name: 'Sort', icon: '↕️', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'Data Processing' },
   { id: 'json', name: 'JSON', icon: '{ }', color: 'from-yellow-400 via-amber-400 to-orange-500', category: 'Data Processing' },
-  
+
   // APIs & Services
   { id: 'http', name: 'HTTP Request', icon: '🌐', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'APIs & Services' },
   { id: 'rest-api', name: 'REST API', icon: '🔌', color: 'from-blue-400 via-cyan-400 to-teal-500', category: 'APIs & Services' },
@@ -81,11 +82,14 @@ const nodeTypes: NodeType[] = [
   { id: 'stripe', name: 'Stripe', icon: '💳', color: 'from-indigo-400 via-purple-400 to-violet-500', category: 'APIs & Services' },
   { id: 'github', name: 'GitHub', icon: '🐙', color: 'from-slate-500 via-gray-500 to-zinc-600', category: 'APIs & Services' },
   { id: 'aws', name: 'AWS', icon: '☁️', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'APIs & Services' },
-  
+
   // Analytics
   { id: 'google-analytics', name: 'Google Analytics', icon: '📈', color: 'from-orange-400 via-red-400 to-pink-500', category: 'Analytics' },
   { id: 'mixpanel', name: 'Mixpanel', icon: '📊', color: 'from-purple-400 via-fuchsia-400 to-pink-500', category: 'Analytics' },
   { id: 'segment', name: 'Segment', icon: '🎯', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'Analytics' },
+
+  // Google Workspace
+  { id: 'google-docs', name: 'Google Docs', icon: '📄', color: 'from-blue-400 via-indigo-400 to-blue-600', category: 'Google Workspace' },
 ];
 
 const WorkflowBuilder = () => {
@@ -103,6 +107,7 @@ const WorkflowBuilder = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [configNode, setConfigNode] = useState<Node | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const { user, logout } = useAuth();
@@ -157,11 +162,11 @@ const WorkflowBuilder = () => {
   const addNode = (type: string) => {
     const nodeType = nodeTypes.find(n => n.id === type);
     if (!nodeType) return;
-    
+
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     const centerX = canvasRect ? (canvasRect.width / 2 - 100) / zoom - pan.x : 1200;
     const centerY = canvasRect ? (canvasRect.height / 2 - 60) / zoom - pan.y : 200;
-    
+
     const newNode: Node = {
       id: `node-${Date.now()}`,
       type,
@@ -178,6 +183,10 @@ const WorkflowBuilder = () => {
     setNodes(nodes.filter(n => n.id !== nodeId));
     setConnections(connections.filter(c => c.from !== nodeId && c.to !== nodeId));
     setSelectedNode(null);
+  };
+
+  const updateNodeData = (nodeId: string, data: Record<string, unknown>) => {
+    setNodes(nodes.map(n => n.id === nodeId ? { ...n, data } : n));
   };
 
   const startConnection = (nodeId: string, e: React.MouseEvent) => {
@@ -199,7 +208,7 @@ const WorkflowBuilder = () => {
       const connectionExists = connections.some(
         c => (c.from === connecting && c.to === nodeId) || (c.from === nodeId && c.to === connecting)
       );
-      
+
       if (!connectionExists) {
         const newConnection = {
           id: `conn-${Date.now()}`,
@@ -261,18 +270,18 @@ const WorkflowBuilder = () => {
           });
         }
       }
-      
+
       if (isDragging && dragStart) {
         const node = nodes.find(n => n.id === isDragging);
         if (node) {
-          setNodes(nodes.map(n => 
-            n.id === isDragging 
+          setNodes(nodes.map(n =>
+            n.id === isDragging
               ? { ...n, position: { x: (e.clientX - pan.x * zoom) / zoom - dragStart.x, y: (e.clientY - pan.y * zoom) / zoom - dragStart.y } }
               : n
           ));
         }
       }
-      
+
       if (isPanning && panStart) {
         const dx = (e.clientX - panStart.x) / zoom;
         const dy = (e.clientY - panStart.y) / zoom;
@@ -283,18 +292,18 @@ const WorkflowBuilder = () => {
         setPanStart({ x: e.clientX, y: e.clientY });
       }
     };
-    
+
     const handleUp = () => {
       setIsDragging(null);
       setConnecting(null);
       setIsPanning(false);
     };
-    
+
     if (isDragging || isPanning || connecting) {
       document.addEventListener('mousemove', handleMove);
       document.addEventListener('mouseup', handleUp);
     }
-    
+
     return () => {
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
@@ -304,18 +313,18 @@ const WorkflowBuilder = () => {
   const getNodeOutputPosition = (nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return { x: 0, y: 0 };
-    return { 
-      x: (node.position.x + 220) * zoom + pan.x * zoom, 
-      y: (node.position.y + 111.5) * zoom + pan.y * zoom 
+    return {
+      x: (node.position.x + 220) * zoom + pan.x * zoom,
+      y: (node.position.y + 111.5) * zoom + pan.y * zoom
     };
   };
 
   const getNodeInputPosition = (nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return { x: 0, y: 0 };
-    return { 
-      x: node.position.x * zoom + pan.x * zoom, 
-      y: (node.position.y + 111.5) * zoom + pan.y * zoom 
+    return {
+      x: node.position.x * zoom + pan.x * zoom,
+      y: (node.position.y + 111.5) * zoom + pan.y * zoom
     };
   };
 
@@ -342,7 +351,7 @@ const WorkflowBuilder = () => {
               </div> */}
               <img src="/warpflow-logo-small-cropped.png" alt="WarpFlow Logo" className="h-10 filter invert object-contain" />
             </div>
-            
+
             <div className="flex items-center gap-3 ml-8">
               <button
                 onClick={runWorkflow}
@@ -394,7 +403,7 @@ const WorkflowBuilder = () => {
                 <span className="text-xs text-slate-500">connections</span>
               </div>
             </div>
-            
+
             {/* User info and logout */}
             <div className="flex items-center gap-3">
               <div className="text-right">
@@ -426,10 +435,9 @@ const WorkflowBuilder = () => {
         )}
 
         {/* Sidebar */}
-        <div 
-          className={`bg-gradient-to-b from-slate-900/50 via-slate-900/30 to-slate-900/50 backdrop-blur-xl border-r border-slate-700/50 flex flex-col shadow-2xl transition-all duration-300 ease-in-out z-20 ${
-            isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0 overflow-hidden'
-          }`}
+        <div
+          className={`bg-gradient-to-b from-slate-900/50 via-slate-900/30 to-slate-900/50 backdrop-blur-xl border-r border-slate-700/50 flex flex-col shadow-2xl transition-all duration-300 ease-in-out z-20 ${isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0 overflow-hidden'
+            }`}
         >
           <div className="p-6 border-b border-slate-700/50 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
@@ -437,7 +445,7 @@ const WorkflowBuilder = () => {
                 <Grid className="w-4 h-4 text-cyan-400" />
                 Node Library
               </h2>
-              <button 
+              <button
                 onClick={() => setIsSidebarOpen(false)}
                 className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
                 title="Close Sidebar"
@@ -445,7 +453,7 @@ const WorkflowBuilder = () => {
                 <PanelLeftClose className="w-4 h-4" />
               </button>
             </div>
-            
+
             {/* Search */}
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -477,7 +485,7 @@ const WorkflowBuilder = () => {
             {categories.filter(cat => cat !== 'All' && filteredNodes.some(n => n.category === cat)).map(category => {
               const categoryNodes = filteredNodes.filter(n => n.category === category);
               if (categoryNodes.length === 0) return null;
-              
+
               return (
                 <div key={category}>
                   <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider flex items-center gap-2">
@@ -499,7 +507,7 @@ const WorkflowBuilder = () => {
                           <span className="text-sm font-semibold text-slate-100 block">{node.name}</span>
                           <span className="text-xs text-slate-500">{node.category}</span>
                         </div>
-                        <button 
+                        <button
                           onClick={() => addNode(node.id)}
                           className="p-1.5 hover:bg-slate-600/50 rounded-lg transition-colors"
                           title="Add to canvas"
@@ -542,7 +550,7 @@ const WorkflowBuilder = () => {
             </div>
           </div>
 
-          <div 
+          <div
             ref={canvasRef}
             className="w-full h-full cursor-move"
             onWheel={handleWheel}
@@ -558,10 +566,10 @@ const WorkflowBuilder = () => {
             <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
               <defs>
                 <filter id="glow">
-                  <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
                   <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
                   </feMerge>
                 </filter>
                 <linearGradient id="connecting-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -570,13 +578,13 @@ const WorkflowBuilder = () => {
                   <stop offset="100%" style={{ stopColor: '#8b5cf6', stopOpacity: 0.8 }} />
                 </linearGradient>
               </defs>
-              
+
               {/* Existing connections */}
               {connections.map(conn => {
                 const from = getNodeOutputPosition(conn.from);
                 const to = getNodeInputPosition(conn.to);
                 const midX = (from.x + to.x) / 2;
-                
+
                 return (
                   <g key={conn.id}>
                     <defs>
@@ -609,7 +617,7 @@ const WorkflowBuilder = () => {
                   </g>
                 );
               })}
-              
+
               {/* Active connecting line while dragging */}
               {connecting && (
                 <g>
@@ -664,8 +672,8 @@ const WorkflowBuilder = () => {
               </div>
             )}
 
-            <div 
-              style={{ 
+            <div
+              style={{
                 transform: `translate(${pan.x * zoom}px, ${pan.y * zoom}px) scale(${zoom})`,
                 transformOrigin: '0 0',
                 position: 'absolute',
@@ -691,12 +699,11 @@ const WorkflowBuilder = () => {
                     setSelectedNode(node.id);
                   }}
                 >
-                  <div className={`relative bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-2xl border-2 rounded-2xl shadow-2xl transition-all cursor-move ${
-                    selectedNode === node.id 
-                      ? 'border-cyan-400 shadow-cyan-500/30 scale-105 ring-4 ring-cyan-500/20' 
-                      : 'border-slate-700/50 hover:border-slate-600 hover:shadow-slate-700/20'
-                  }`} style={{ width: '220px' }}>
-                    
+                  <div className={`relative bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-2xl border-2 rounded-2xl shadow-2xl transition-all cursor-move ${selectedNode === node.id
+                    ? 'border-cyan-400 shadow-cyan-500/30 scale-105 ring-4 ring-cyan-500/20'
+                    : 'border-slate-700/50 hover:border-slate-600 hover:shadow-slate-700/20'
+                    }`} style={{ width: '220px' }}>
+
                     {/* Node Header */}
                     <div className={`h-24 rounded-t-2xl bg-gradient-to-br ${node.color} flex items-center justify-center relative overflow-hidden`}>
                       <div className="absolute inset-0 bg-black/10 backdrop-blur-sm"></div>
@@ -704,7 +711,7 @@ const WorkflowBuilder = () => {
                         <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
                       </div>
                       <div className="text-5xl relative z-10 drop-shadow-lg">{node.icon}</div>
-                      
+
                       {/* Control Buttons */}
                       <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -745,7 +752,7 @@ const WorkflowBuilder = () => {
                     <div className="p-5">
                       <h3 className="font-bold text-slate-100 mb-1.5 text-base">{node.name}</h3>
                       <p className="text-xs text-slate-400 mb-3">{node.type.split('-').join(' ')}</p>
-                      
+
                       {/* Node Stats */}
                       <div className="flex items-center gap-3 pt-3 border-t border-slate-700/50">
                         <div className="flex items-center gap-1.5">
@@ -753,7 +760,10 @@ const WorkflowBuilder = () => {
                           <span className="text-xs text-slate-400">Ready</span>
                         </div>
                         <div className="w-px h-3 bg-slate-700"></div>
-                        <button className="text-xs text-slate-400 hover:text-cyan-400 flex items-center gap-1 transition-colors">
+                        <button
+                          className="text-xs text-slate-400 hover:text-cyan-400 flex items-center gap-1 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); setConfigNode(node); }}
+                        >
                           <Settings className="w-3 h-3" />
                           Configure
                         </button>
@@ -805,6 +815,18 @@ const WorkflowBuilder = () => {
           Press Space + Drag to pan · Scroll to zoom · Click node to select
         </div>
       </div>
+
+      {/* Node Config Modal */}
+      {configNode && (
+        <NodeConfigModal
+          node={configNode}
+          onClose={() => setConfigNode(null)}
+          onSave={(data) => {
+            updateNodeData(configNode.id, data);
+            setConfigNode(null);
+          }}
+        />
+      )}
     </div>
   );
 };
