@@ -12,6 +12,8 @@ from app.database import engine, Base, async_session
 from app.rate_limit import limiter
 from app.auth.router import router as auth_router
 from app.workflows.router import router as workflows_router, templates_router
+from app.google_docs.router import router as google_docs_router
+from app.google_docs.credentials_router import router as credentials_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -81,6 +83,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_router)
 app.include_router(workflows_router)
 app.include_router(templates_router)
+app.include_router(credentials_router)
+app.include_router(google_docs_router)
 
 
 @app.get("/health")

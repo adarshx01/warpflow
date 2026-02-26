@@ -62,4 +62,7 @@ NODE_TEMPLATES = [
     {"id": "google-analytics","name": "Google Analytics",   "icon": "📈",  "color": "from-orange-400 via-red-400 to-pink-500",       "category": "Analytics",        "description": "Read Google Analytics data"},
     {"id": "mixpanel",        "name": "Mixpanel",           "icon": "📊",  "color": "from-purple-400 via-fuchsia-400 to-pink-500",   "category": "Analytics",        "description": "Send events and query Mixpanel data"},
     {"id": "segment",         "name": "Segment",            "icon": "🎯",  "color": "from-green-400 via-emerald-400 to-teal-500",    "category": "Analytics",        "description": "Track events and manage user data"},
+
+    # ── Google Workspace ────────────────────────────────
+    {"id": "google-docs",     "name": "Google Docs",        "icon": "📄",  "color": "from-blue-400 via-indigo-400 to-blue-600",     "category": "Google Workspace", "description": "Create, read, update, delete, and search Google Docs"},
 ]
