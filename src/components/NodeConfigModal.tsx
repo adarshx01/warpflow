@@ -1,6 +1,12 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import GoogleDocsConfig from './nodes/GoogleDocsConfig';
+import GoogleDriveConfig from './nodes/GoogleDriveConfig';
+import GmailConfig from './nodes/GmailConfig';
+import GoogleSheetsConfig from './nodes/GoogleSheetsConfig';
+import GoogleFormsConfig from './nodes/GoogleFormsConfig';
+import OpenAIConfig from './nodes/OpenAIConfig';
+import GeminiConfig from './nodes/GeminiConfig';
 
 interface Node {
     id: string;
@@ -22,17 +28,22 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
     if (!node) return null;
 
     const renderConfigPanel = () => {
+        const handleSave = (data: Record<string, unknown>) => { onSave(data); onClose(); };
         switch (node.type) {
             case 'google-docs':
-                return (
-                    <GoogleDocsConfig
-                        initialData={node.data}
-                        onSave={(data: Record<string, unknown>) => {
-                            onSave(data);
-                            onClose();
-                        }}
-                    />
-                );
+                return <GoogleDocsConfig initialData={node.data} onSave={handleSave} />;
+            case 'google-drive':
+                return <GoogleDriveConfig initialData={node.data} onSave={handleSave} />;
+            case 'gmail':
+                return <GmailConfig initialData={node.data} onSave={handleSave} />;
+            case 'google-sheets':
+                return <GoogleSheetsConfig initialData={node.data} onSave={handleSave} />;
+            case 'google-forms':
+                return <GoogleFormsConfig initialData={node.data} onSave={handleSave} />;
+            case 'openai':
+                return <OpenAIConfig initialData={node.data} onSave={handleSave} />;
+            case 'gemini':
+                return <GeminiConfig initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">

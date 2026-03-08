@@ -36,7 +36,8 @@ const nodeTypes: NodeType[] = [
   { id: 'email-trigger', name: 'Email Trigger', icon: '📨', color: 'from-pink-400 via-rose-400 to-red-500', category: 'Triggers' },
 
   // AI & ML
-  { id: 'openai', name: 'OpenAI', icon: '🧠', color: 'from-emerald-400 via-teal-400 to-cyan-500', category: 'AI & ML' },
+  { id: 'openai', name: 'OpenAI (ChatGPT)', icon: '🧠', color: 'from-emerald-400 via-teal-400 to-cyan-500', category: 'AI & ML' },
+  { id: 'gemini', name: 'Google Gemini', icon: '✨', color: 'from-blue-400 via-violet-400 to-purple-500', category: 'AI & ML' },
   { id: 'anthropic', name: 'Anthropic Claude', icon: '🤖', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'AI & ML' },
   { id: 'huggingface', name: 'HuggingFace', icon: '🤗', color: 'from-yellow-400 via-orange-400 to-amber-500', category: 'AI & ML' },
   { id: 'ai-agent', name: 'AI Agent', icon: '👾', color: 'from-purple-400 via-fuchsia-400 to-pink-500', category: 'AI & ML' },
@@ -56,7 +57,7 @@ const nodeTypes: NodeType[] = [
   { id: 'mongodb', name: 'MongoDB', icon: '🍃', color: 'from-green-500 via-emerald-500 to-teal-600', category: 'Data & Storage' },
   { id: 'redis', name: 'Redis', icon: '⚡', color: 'from-red-500 via-orange-500 to-amber-600', category: 'Data & Storage' },
   { id: 'mysql', name: 'MySQL', icon: '🐬', color: 'from-blue-400 via-cyan-400 to-teal-500', category: 'Data & Storage' },
-  { id: 'google-sheets', name: 'Google Sheets', icon: '📊', color: 'from-green-400 via-emerald-400 to-green-500', category: 'Data & Storage' },
+  { id: 'google-sheets', name: 'Google Sheets', icon: '📊', color: 'from-green-400 via-emerald-400 to-green-500', category: 'Google Workspace' },
   { id: 'airtable', name: 'Airtable', icon: '📋', color: 'from-yellow-400 via-orange-400 to-red-500', category: 'Data & Storage' },
   { id: 'csv', name: 'CSV', icon: '📄', color: 'from-slate-400 via-gray-400 to-zinc-500', category: 'Data & Storage' },
 
@@ -90,6 +91,9 @@ const nodeTypes: NodeType[] = [
 
   // Google Workspace
   { id: 'google-docs', name: 'Google Docs', icon: '📄', color: 'from-blue-400 via-indigo-400 to-blue-600', category: 'Google Workspace' },
+  { id: 'google-drive', name: 'Google Drive', icon: '📁', color: 'from-yellow-400 via-green-400 to-green-600', category: 'Google Workspace' },
+  { id: 'gmail', name: 'Gmail', icon: '✉️', color: 'from-red-400 via-yellow-400 to-green-500', category: 'Google Workspace' },
+  { id: 'google-forms', name: 'Google Forms', icon: '📝', color: 'from-purple-400 via-indigo-400 to-blue-500', category: 'Google Workspace' },
 ];
 
 const WorkflowBuilder = () => {
