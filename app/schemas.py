@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, UUID4, field_validator
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
@@ -59,3 +59,22 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     """Returned in the JSON body (cookie carries the actual token)."""
     user: UserResponse
+
+
+# ---- Credential Schemas ----
+
+class CredentialCreate(BaseModel):
+    type: str
+    name: str
+    client_id: str
+    client_secret: str
+
+
+class CredentialResponse(BaseModel):
+    id: UUID4
+    type: str
+    name: str
+    has_tokens: bool  # True if access_token is set
+
+    class Config:
+        from_attributes = True

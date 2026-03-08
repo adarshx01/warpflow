@@ -13,7 +13,7 @@ from app.rate_limit import limiter
 from app.auth.router import router as auth_router
 from app.workflows.router import router as workflows_router, templates_router
 from app.services.google.google_docs.router import router as google_docs_router
-from app.services.google.google_docs.credentials_router import router as credentials_router
+from app.services.credentials_router import router as credentials_router
 from app.services.google.google_drive.router import router as google_drive_router
 from app.services.google.gmail.router import router as gmail_router
 from app.services.google.google_sheets.router import router as google_sheets_router

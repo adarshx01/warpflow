@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import User, Credential
 from app.auth.utils import get_current_user
-from app.services.google.google_docs.schemas import CredentialCreate, CredentialResponse
+from app.schemas import CredentialCreate, CredentialResponse
 
 logger = logging.getLogger(__name__)
 

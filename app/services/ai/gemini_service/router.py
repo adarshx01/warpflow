@@ -22,7 +22,7 @@ GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 async def generate_content(api_key: str, params: dict[str, Any]) -> dict:
     """Generate content using Gemini models."""
-    model = params.get("model", "gemini-pro")
+    model = params.get("model", "gemini-3-flash-preview")
     prompt = params.get("prompt", "")
     system_instruction = params.get("systemInstruction")
     temperature = params.get("temperature", 0.7)
@@ -79,7 +79,7 @@ async def generate_content(api_key: str, params: dict[str, Any]) -> dict:
 
 async def chat(api_key: str, params: dict[str, Any]) -> dict:
     """Multi-turn chat using Gemini."""
-    model = params.get("model", "gemini-pro")
+    model = params.get("model", "gemini-3-flash-preview")
     messages = params.get("messages", [])
     system_instruction = params.get("systemInstruction")
     temperature = params.get("temperature", 0.7)

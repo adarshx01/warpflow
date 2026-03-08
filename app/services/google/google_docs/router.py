@@ -3,19 +3,22 @@ Google Docs router: OAuth2 flow + execute endpoint with 5 Google API helpers.
 """
 import logging
 import uuid
-from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import User, Credential
+from app.models import User
 from app.auth.utils import get_current_user
 from app.rate_limit import limiter
+from app.services.google.common import (
+    get_user_credential, get_valid_access_token,
+    auth_headers, handle_google_error,
+    google_oauth_start, google_oauth_callback,
+)
 from app.services.google.google_docs.schemas import ExecuteRequest
 
 logger = logging.getLogger(__name__)
@@ -26,95 +29,10 @@ GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/documents",
     "https://www.googleapis.com/auth/drive.file",
 ]
-GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 DOCS_API_BASE = "https://docs.googleapis.com/v1/documents"
 DRIVE_API_BASE = "https://www.googleapis.com/drive/v3/files"
 REDIRECT_URI = "http://localhost:8000/api/google-docs/oauth/callback"
 FRONTEND_SUCCESS_URL = "http://localhost:5173?google_auth=success"
-
-
-# ──────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────
-
-
-async def _get_user_credential(
-    db: AsyncSession,
-    credential_id: uuid.UUID,
-    owner_id: uuid.UUID,
-) -> Credential:
-    """Fetch a credential and verify ownership."""
-    stmt = select(Credential).where(
-        Credential.id == credential_id,
-        Credential.owner_id == owner_id,
-    )
-    result = await db.execute(stmt)
-    cred = result.scalar_one_or_none()
-    if not cred:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential not found")
-    return cred
-
-
-async def get_valid_access_token(credential: Credential, db: AsyncSession) -> str:
-    """Return a valid access token, auto-refreshing if expired."""
-    if not credential.access_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Google account not connected. Please complete OAuth flow.",
-        )
-
-    # Token still valid?
-    if credential.token_expiry and credential.token_expiry > datetime.now(timezone.utc):
-        return credential.access_token
-
-    # Refresh the token
-    if not credential.refresh_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Google account not connected. Please complete OAuth flow.",
-        )
-
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.post(
-                GOOGLE_TOKEN_URL,
-                data={
-                    "client_id": credential.client_id,
-                    "client_secret": credential.client_secret,
-                    "refresh_token": credential.refresh_token,
-                    "grant_type": "refresh_token",
-                },
-            )
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            logger.error("Token refresh failed: %s", exc.response.text)
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Failed to refresh Google access token: {exc.response.text}",
-            )
-
-    token_data = resp.json()
-    credential.access_token = token_data["access_token"]
-    expires_in = token_data.get("expires_in", 3600)
-    credential.token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-    await db.commit()
-    return credential.access_token
-
-
-def _auth_headers(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
-
-
-async def _handle_google_error(exc: httpx.HTTPStatusError) -> None:
-    try:
-        detail = exc.response.json()
-    except Exception:
-        detail = exc.response.text
-    raise HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        detail=detail,
-    )
 
 
 # ──────────────────────────────────────────────
@@ -129,25 +47,8 @@ async def oauth_start(
     current_user: User = Depends(get_current_user),
 ):
     """Redirect the browser to Google's OAuth consent screen."""
-    # Verify credential exists and belongs to this user
-    await _get_user_credential(db, credential_id, current_user.id)
-
-    params = {
-        "client_id": (
-            await db.execute(
-                select(Credential.client_id).where(Credential.id == credential_id)
-            )
-        )
-        .scalar_one(),
-        "redirect_uri": REDIRECT_URI,
-        "response_type": "code",
-        "scope": " ".join(GOOGLE_SCOPES),
-        "access_type": "offline",
-        "prompt": "consent",
-        "state": str(credential_id),
-    }
-    from urllib.parse import urlencode
-    url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
+    cred = await get_user_credential(db, credential_id, current_user.id)
+    url = await google_oauth_start(cred, GOOGLE_SCOPES, REDIRECT_URI)
     return RedirectResponse(url=url)
 
 
@@ -158,46 +59,7 @@ async def oauth_callback(
     db: AsyncSession = Depends(get_db),
 ):
     """Exchange the auth code for tokens and store them on the credential."""
-    # state == credential_id
-    try:
-        cred_id = uuid.UUID(state)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state")
-
-    stmt = select(Credential).where(Credential.id == cred_id)
-    result = await db.execute(stmt)
-    cred = result.scalar_one_or_none()
-    if not cred:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential not found")
-
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.post(
-                GOOGLE_TOKEN_URL,
-                data={
-                    "code": code,
-                    "client_id": cred.client_id,
-                    "client_secret": cred.client_secret,
-                    "redirect_uri": REDIRECT_URI,
-                    "grant_type": "authorization_code",
-                },
-            )
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            logger.error("OAuth code exchange failed: %s", exc.response.text)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Google OAuth failed: {exc.response.text}",
-            )
-
-    token_data = resp.json()
-    cred.access_token = token_data["access_token"]
-    cred.refresh_token = token_data.get("refresh_token", cred.refresh_token)
-    expires_in = token_data.get("expires_in", 3600)
-    cred.token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-    await db.commit()
-    logger.info("OAuth tokens stored for credential %s", cred_id)
-
+    await google_oauth_callback(code, state, REDIRECT_URI, db, FRONTEND_SUCCESS_URL)
     return RedirectResponse(url=FRONTEND_SUCCESS_URL)
 
 
@@ -212,7 +74,7 @@ async def create_document(token: str, params: dict[str, Any]) -> dict:
     content = params.get("content")
     folder_id = params.get("folderId")
 
-    headers = _auth_headers(token)
+    headers = auth_headers(token)
 
     async with httpx.AsyncClient() as client:
         # 1. Create doc
@@ -224,7 +86,7 @@ async def create_document(token: str, params: dict[str, Any]) -> dict:
             )
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            await _handle_google_error(exc)
+            await handle_google_error(exc)
 
         doc = resp.json()
         doc_id = doc["documentId"]
@@ -243,7 +105,7 @@ async def create_document(token: str, params: dict[str, Any]) -> dict:
                 )
                 batch_resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
-                await _handle_google_error(exc)
+                await handle_google_error(exc)
 
         # 3. Move to folder if provided
         if folder_id:
@@ -255,7 +117,7 @@ async def create_document(token: str, params: dict[str, Any]) -> dict:
                 )
                 move_resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
-                await _handle_google_error(exc)
+                await handle_google_error(exc)
 
     return {
         "documentId": doc_id,
@@ -274,10 +136,10 @@ async def get_document(token: str, params: dict[str, Any]) -> dict:
 
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.get(f"{DOCS_API_BASE}/{doc_id}", headers=_auth_headers(token))
+            resp = await client.get(f"{DOCS_API_BASE}/{doc_id}", headers=auth_headers(token))
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            await _handle_google_error(exc)
+            await handle_google_error(exc)
 
     doc = resp.json()
 
@@ -306,7 +168,7 @@ async def update_document(token: str, params: dict[str, Any]) -> dict:
 
     update_mode = params.get("updateMode", "append")
     content = params.get("content", "")
-    headers = _auth_headers(token)
+    headers = auth_headers(token)
 
     async with httpx.AsyncClient() as client:
         # We need the current doc for index calculations
@@ -314,7 +176,7 @@ async def update_document(token: str, params: dict[str, Any]) -> dict:
             resp = await client.get(f"{DOCS_API_BASE}/{doc_id}", headers=headers)
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            await _handle_google_error(exc)
+            await handle_google_error(exc)
 
         doc = resp.json()
         body_content = doc.get("body", {}).get("content", [])
@@ -378,7 +240,7 @@ async def update_document(token: str, params: dict[str, Any]) -> dict:
             )
             batch_resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            await _handle_google_error(exc)
+            await handle_google_error(exc)
 
     return {"success": True, "documentId": doc_id}
 
@@ -400,11 +262,11 @@ async def delete_document(token: str, params: dict[str, Any]) -> dict:
         try:
             resp = await client.delete(
                 f"{DRIVE_API_BASE}/{doc_id}",
-                headers=_auth_headers(token),
+                headers=auth_headers(token),
             )
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            await _handle_google_error(exc)
+            await handle_google_error(exc)
 
     return {"success": True, "documentId": doc_id, "message": "Document moved to trash"}
 
@@ -424,10 +286,10 @@ async def find_text_in_document(token: str, params: dict[str, Any]) -> dict:
 
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.get(f"{DOCS_API_BASE}/{doc_id}", headers=_auth_headers(token))
+            resp = await client.get(f"{DOCS_API_BASE}/{doc_id}", headers=auth_headers(token))
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            await _handle_google_error(exc)
+            await handle_google_error(exc)
 
     doc = resp.json()
     body_content = doc.get("body", {}).get("content", [])
@@ -495,7 +357,7 @@ async def execute(
     current_user: User = Depends(get_current_user),
 ):
     """Dispatch a Google Docs operation on behalf of the authenticated user."""
-    credential = await _get_user_credential(db, body.credentialId, current_user.id)
+    credential = await get_user_credential(db, body.credentialId, current_user.id)
     token = await get_valid_access_token(credential, db)
 
     match body.operation:
