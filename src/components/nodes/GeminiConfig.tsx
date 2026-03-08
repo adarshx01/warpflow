@@ -14,7 +14,7 @@ const OPERATIONS: { value: Operation; label: string; description: string }[] = [
     { value: 'chat', label: 'Chat', description: 'Multi-turn conversation with Gemini' },
 ];
 
-const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+const MODELS = ['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-2.5-flash','gemini-3.1-flash-lite-preview'];
 
 const inputClass = 'w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all';
 const labelClass = 'block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider';
