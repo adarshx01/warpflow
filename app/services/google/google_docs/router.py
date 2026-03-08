@@ -16,7 +16,7 @@ from app.database import get_db
 from app.models import User, Credential
 from app.auth.utils import get_current_user
 from app.rate_limit import limiter
-from app.google_docs.schemas import ExecuteRequest
+from app.services.google.google_docs.schemas import ExecuteRequest
 
 logger = logging.getLogger(__name__)
 
