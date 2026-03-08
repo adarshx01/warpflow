@@ -11,9 +11,10 @@ NODE_TEMPLATES = [
     {"id": "email-trigger",   "name": "Email Trigger",      "icon": "📨",  "color": "from-pink-400 via-rose-400 to-red-500",         "category": "Triggers",         "description": "Trigger when a new email arrives"},
 
     # ── AI & ML ───────────────────────────────────
-    {"id": "openai",          "name": "OpenAI",             "icon": "🧠",  "color": "from-emerald-400 via-teal-400 to-cyan-500",     "category": "AI & ML",          "description": "Generate text with GPT models"},
+    {"id": "openai",          "name": "OpenAI (ChatGPT)",  "icon": "🧠",  "color": "from-emerald-400 via-teal-400 to-cyan-500",     "category": "AI & ML",          "description": "Generate text, chat, and images with OpenAI GPT & DALL-E models"},
     {"id": "anthropic",       "name": "Anthropic Claude",   "icon": "🤖",  "color": "from-orange-400 via-amber-400 to-yellow-500",   "category": "AI & ML",          "description": "Generate text with Claude models"},
     {"id": "huggingface",     "name": "HuggingFace",        "icon": "🤗",  "color": "from-yellow-400 via-orange-400 to-amber-500",   "category": "AI & ML",          "description": "Run inference on HuggingFace models"},
+    {"id": "gemini",          "name": "Google Gemini",      "icon": "✨",  "color": "from-blue-400 via-purple-400 to-pink-500",      "category": "AI & ML",          "description": "Generate content and chat with Google Gemini AI models"},
     {"id": "ai-agent",        "name": "AI Agent",           "icon": "👾",  "color": "from-purple-400 via-fuchsia-400 to-pink-500",   "category": "AI & ML",          "description": "Autonomous AI agent with tool use"},
     {"id": "text-analysis",   "name": "Text Analysis",      "icon": "📝",  "color": "from-blue-400 via-cyan-400 to-teal-500",        "category": "AI & ML",          "description": "Sentiment, classification, NER and more"},
     {"id": "image-gen",       "name": "Image Generation",   "icon": "🎨",  "color": "from-pink-400 via-purple-400 to-indigo-500",    "category": "AI & ML",          "description": "Generate images from text prompts"},
@@ -65,4 +66,8 @@ NODE_TEMPLATES = [
 
     # ── Google Workspace ────────────────────────────────
     {"id": "google-docs",     "name": "Google Docs",        "icon": "📄",  "color": "from-blue-400 via-indigo-400 to-blue-600",     "category": "Google Workspace", "description": "Create, read, update, delete, and search Google Docs"},
+    {"id": "google-drive",    "name": "Google Drive",       "icon": "📁",  "color": "from-yellow-400 via-green-400 to-blue-500",    "category": "Google Workspace", "description": "List, upload, download, delete, and share files on Google Drive"},
+    {"id": "gmail",           "name": "Gmail",              "icon": "✉️",  "color": "from-red-400 via-red-500 to-rose-600",         "category": "Google Workspace", "description": "Send, read, search, and manage Gmail messages"},
+    {"id": "google-sheets",   "name": "Google Sheets",      "icon": "📊",  "color": "from-green-400 via-emerald-400 to-green-600",  "category": "Google Workspace", "description": "Create, read, write, and append data in Google Sheets","default_data": {}},
+    {"id": "google-forms",    "name": "Google Forms",       "icon": "📋",  "color": "from-purple-400 via-violet-400 to-purple-600", "category": "Google Workspace", "description": "Create forms, add questions, and collect responses"},
 ]
