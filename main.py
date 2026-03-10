@@ -20,6 +20,7 @@ from app.services.google.google_sheets.router import router as google_sheets_rou
 from app.services.google.google_forms.router import router as google_forms_router
 from app.services.ai.openai_service.router import router as openai_router
 from app.services.ai.gemini_service.router import router as gemini_router
+from app.services.agent.router import router as agent_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -97,6 +98,7 @@ app.include_router(google_sheets_router)
 app.include_router(google_forms_router)
 app.include_router(openai_router)
 app.include_router(gemini_router)
+app.include_router(agent_router)
 
 
 @app.get("/health")

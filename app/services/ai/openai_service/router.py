@@ -19,6 +19,22 @@ router = APIRouter(prefix="/api/openai", tags=["openai"])
 
 OPENAI_API_BASE = "https://api.openai.com/v1"
 
+AVAILABLE_MODELS = [
+    {"id": "gpt-4o", "name": "GPT-4o", "description": "Most capable multimodal model"},
+    {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "description": "Fast and affordable"},
+    {"id": "gpt-4-turbo", "name": "GPT-4 Turbo", "description": "High-performance GPT-4"},
+    {"id": "gpt-4", "name": "GPT-4", "description": "Original GPT-4"},
+    {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "description": "Fast and cost-effective"},
+]
+
+
+@router.get("/models")
+async def list_models(
+    current_user: User = Depends(get_current_user),
+):
+    """Return available OpenAI models."""
+    return AVAILABLE_MODELS
+
 
 async def chat_completion(api_key: str, params: dict[str, Any]) -> dict:
     """Generate a chat completion using OpenAI GPT models."""

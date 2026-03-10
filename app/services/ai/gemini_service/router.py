@@ -19,6 +19,21 @@ router = APIRouter(prefix="/api/gemini", tags=["gemini"])
 
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
+AVAILABLE_MODELS = [
+    {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "description": "Fast and versatile"},
+    {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash Preview", "description": "Next-gen fast model"},
+    {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro Preview", "description": "Most capable model"},
+    {"id": "gemini-3.1-flash-lite-preview", "name": "Gemini 3.1 Flash Lite Preview", "description": "Lightweight and efficient"},
+]
+
+
+@router.get("/models")
+async def list_models(
+    current_user: User = Depends(get_current_user),
+):
+    """Return available Gemini models."""
+    return AVAILABLE_MODELS
+
 
 async def generate_content(api_key: str, params: dict[str, Any]) -> dict:
     """Generate content using Gemini models."""
