@@ -307,6 +307,7 @@ const GoogleDocsConfig: React.FC<GoogleDocsConfigProps> = ({ initialData, onSave
                 setLoadingCreds(false);
             }
         })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleAddCredential = async () => {

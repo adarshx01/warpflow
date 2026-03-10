@@ -107,6 +107,7 @@ const GoogleFormsConfig: React.FC<GoogleFormsConfigProps> = ({ initialData, onSa
                 if (data.length > 0 && !credentialId) setCredentialId(data[0].id);
             } catch { /* ignore */ } finally { setLoadingCreds(false); }
         })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleAddCredential = async () => {

@@ -3,6 +3,7 @@ import { Plus, Play, Trash2, ZoomIn, ZoomOut, Maximize2, Save, Download, Search,
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import NodeConfigModal from '../components/NodeConfigModal';
+import ExecuteModal from '../components/ExecuteModal';
 
 interface NodeType {
   id: string;
@@ -103,7 +104,6 @@ const WorkflowBuilder = () => {
   const [isDragging, setIsDragging] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -112,6 +112,7 @@ const WorkflowBuilder = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [configNode, setConfigNode] = useState<Node | null>(null);
+  const [showExecuteModal, setShowExecuteModal] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const { user, logout } = useAuth();
@@ -333,8 +334,7 @@ const WorkflowBuilder = () => {
   };
 
   const runWorkflow = () => {
-    setIsRunning(true);
-    setTimeout(() => setIsRunning(false), 2000);
+    setShowExecuteModal(true);
   };
 
   return (
@@ -362,22 +362,11 @@ const WorkflowBuilder = () => {
                 disabled={nodes.length === 0}
                 className="group px-6 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 text-white rounded-xl font-semibold flex items-center gap-2.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 active:scale-95 relative overflow-hidden"
               >
-                {isRunning && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
-                )}
                 <div className="relative z-10 flex items-center gap-2.5">
-                  {isRunning ? (
-                    <div className="relative w-5 h-5">
-                      <div className="absolute inset-0 border-3 border-white/30 rounded-full"></div>
-                      <div className="absolute inset-0 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <div className="absolute inset-0 border-3 border-white/50 border-b-transparent rounded-full animate-spin-reverse"></div>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <Play className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="currentColor" />
-                    </div>
-                  )}
-                  <span>{isRunning ? 'Running...' : 'Run Workflow'}</span>
+                  <div className="relative">
+                    <Play className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="currentColor" />
+                  </div>
+                  <span>Run Workflow</span>
                 </div>
               </button>
 
@@ -743,13 +732,6 @@ const WorkflowBuilder = () => {
                         </button>
                       </div>
 
-                      {/* Status Indicator */}
-                      {isRunning && (
-                        <div className="absolute top-3 left-3">
-                          <div className="w-3 h-3 bg-green-400 rounded-full animate-ping absolute"></div>
-                          <div className="w-3 h-3 bg-green-400 rounded-full relative"></div>
-                        </div>
-                      )}
                     </div>
 
                     {/* Node Content */}
@@ -829,6 +811,15 @@ const WorkflowBuilder = () => {
             updateNodeData(configNode.id, data);
             setConfigNode(null);
           }}
+        />
+      )}
+
+      {/* Execute Workflow Modal */}
+      {showExecuteModal && (
+        <ExecuteModal
+          nodes={nodes}
+          connections={connections}
+          onClose={() => setShowExecuteModal(false)}
         />
       )}
     </div>

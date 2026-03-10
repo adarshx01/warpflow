@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, CheckCircle2, AlertCircle, Loader2, Play, Key, Eye, EyeOff } from 'lucide-react';
 import { api } from '../../lib/api';
 
 type Operation = 'chat_completion' | 'image_generation';
+
+interface ModelInfo { id: string; name: string; description: string; }
 
 interface OpenAIConfigProps {
     initialData: Record<string, unknown>;
@@ -14,7 +16,7 @@ const OPERATIONS: { value: Operation; label: string; description: string }[] = [
     { value: 'image_generation', label: 'Image Generation', description: 'Generate images using DALL-E' },
 ];
 
-const MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'];
+const FALLBACK_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'];
 
 const inputClass = 'w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all';
 const labelClass = 'block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider';
@@ -27,12 +29,12 @@ const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode 
     </div>
 );
 
-const ChatCompletionForm: React.FC<{ params: Record<string, unknown>; onChange: (p: Record<string, unknown>) => void }> = ({ params, onChange }) => (
+const ChatCompletionForm: React.FC<{ params: Record<string, unknown>; onChange: (p: Record<string, unknown>) => void; models: string[] }> = ({ params, onChange, models }) => (
     <div className="space-y-4">
         <Field label="Model">
             <div className="relative">
                 <select value={(params.model as string) ?? 'gpt-4o-mini'} onChange={(e) => onChange({ ...params, model: e.target.value })} className={`${inputClass} appearance-none pr-8`}>
-                    {MODELS.map((m) => (<option key={m} value={m}>{m}</option>))}
+                    {models.map((m) => (<option key={m} value={m}>{m}</option>))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
@@ -82,6 +84,13 @@ const OpenAIConfig: React.FC<OpenAIConfigProps> = ({ initialData, onSave }) => {
     const [params, setParams] = useState<Record<string, unknown>>((initialData.params as Record<string, unknown>) ?? {});
     const [testResult, setTestResult] = useState<{ ok: boolean; data: unknown } | null>(null);
     const [testing, setTesting] = useState(false);
+    const [models, setModels] = useState<string[]>(FALLBACK_MODELS);
+
+    useEffect(() => {
+        api<ModelInfo[]>('/api/openai/models')
+            .then((data) => setModels(data.map((m) => m.id)))
+            .catch(() => { /* use fallback */ });
+    }, []);
 
     const handleTest = async () => {
         if (!apiKey) return;
@@ -133,7 +142,7 @@ const OpenAIConfig: React.FC<OpenAIConfigProps> = ({ initialData, onSave }) => {
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <div className="w-1 h-4 bg-gradient-to-b from-emerald-400 to-sky-500 rounded-full" />Parameters
                 </h3>
-                {operation === 'chat_completion' && <ChatCompletionForm params={params} onChange={setParams} />}
+                {operation === 'chat_completion' && <ChatCompletionForm params={params} onChange={setParams} models={models} />}
                 {operation === 'image_generation' && <ImageGenerationForm params={params} onChange={setParams} />}
             </section>
 

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, CheckCircle2, AlertCircle, Loader2, Play, Key, Eye, EyeOff } from 'lucide-react';
 import { api } from '../../lib/api';
 
 type Operation = 'generate_content' | 'chat';
+
+interface ModelInfo { id: string; name: string; description: string; }
 
 interface GeminiConfigProps {
     initialData: Record<string, unknown>;
@@ -14,7 +16,7 @@ const OPERATIONS: { value: Operation; label: string; description: string }[] = [
     { value: 'chat', label: 'Chat', description: 'Multi-turn conversation with Gemini' },
 ];
 
-const MODELS = ['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-2.5-flash','gemini-3.1-flash-lite-preview'];
+const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview'];
 
 const inputClass = 'w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all';
 const labelClass = 'block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider';
@@ -27,12 +29,12 @@ const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode 
     </div>
 );
 
-const GenerateContentForm: React.FC<{ params: Record<string, unknown>; onChange: (p: Record<string, unknown>) => void }> = ({ params, onChange }) => (
+const GenerateContentForm: React.FC<{ params: Record<string, unknown>; onChange: (p: Record<string, unknown>) => void; models: string[] }> = ({ params, onChange, models }) => (
     <div className="space-y-4">
         <Field label="Model">
             <div className="relative">
-                <select value={(params.model as string) ?? 'gemini-2.0-flash'} onChange={(e) => onChange({ ...params, model: e.target.value })} className={`${inputClass} appearance-none pr-8`}>
-                    {MODELS.map((m) => (<option key={m} value={m}>{m}</option>))}
+                <select value={(params.model as string) ?? 'gemini-2.5-flash'} onChange={(e) => onChange({ ...params, model: e.target.value })} className={`${inputClass} appearance-none pr-8`}>
+                    {models.map((m) => (<option key={m} value={m}>{m}</option>))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
@@ -51,12 +53,12 @@ const GenerateContentForm: React.FC<{ params: Record<string, unknown>; onChange:
     </div>
 );
 
-const ChatForm: React.FC<{ params: Record<string, unknown>; onChange: (p: Record<string, unknown>) => void }> = ({ params, onChange }) => (
+const ChatForm: React.FC<{ params: Record<string, unknown>; onChange: (p: Record<string, unknown>) => void; models: string[] }> = ({ params, onChange, models }) => (
     <div className="space-y-4">
         <Field label="Model">
             <div className="relative">
-                <select value={(params.model as string) ?? 'gemini-2.0-flash'} onChange={(e) => onChange({ ...params, model: e.target.value })} className={`${inputClass} appearance-none pr-8`}>
-                    {MODELS.map((m) => (<option key={m} value={m}>{m}</option>))}
+                <select value={(params.model as string) ?? 'gemini-2.5-flash'} onChange={(e) => onChange({ ...params, model: e.target.value })} className={`${inputClass} appearance-none pr-8`}>
+                    {models.map((m) => (<option key={m} value={m}>{m}</option>))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
@@ -83,6 +85,13 @@ const GeminiConfig: React.FC<GeminiConfigProps> = ({ initialData, onSave }) => {
     const [params, setParams] = useState<Record<string, unknown>>((initialData.params as Record<string, unknown>) ?? {});
     const [testResult, setTestResult] = useState<{ ok: boolean; data: unknown } | null>(null);
     const [testing, setTesting] = useState(false);
+    const [models, setModels] = useState<string[]>(FALLBACK_MODELS);
+
+    useEffect(() => {
+        api<ModelInfo[]>('/api/gemini/models')
+            .then((data) => setModels(data.map((m) => m.id)))
+            .catch(() => { /* use fallback */ });
+    }, []);
 
     const handleTest = async () => {
         if (!apiKey) return;
@@ -138,8 +147,8 @@ const GeminiConfig: React.FC<GeminiConfigProps> = ({ initialData, onSave }) => {
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <div className="w-1 h-4 bg-gradient-to-b from-blue-400 to-violet-500 rounded-full" />Parameters
                 </h3>
-                {operation === 'generate_content' && <GenerateContentForm params={params} onChange={setParams} />}
-                {operation === 'chat' && <ChatForm params={params} onChange={setParams} />}
+                {operation === 'generate_content' && <GenerateContentForm params={params} onChange={setParams} models={models} />}
+                {operation === 'chat' && <ChatForm params={params} onChange={setParams} models={models} />}
             </section>
 
             <div className="h-px bg-slate-700/50" />
