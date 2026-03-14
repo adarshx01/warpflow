@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, ChevronDown, ExternalLink, CheckCircle2, AlertCircle, Loader2, Play } from 'lucide-react';
 import { api } from '../../lib/api';
+import { getSecret } from '../../lib/secrets';
 
 type Operation = 'send_email' | 'list_messages' | 'get_message' | 'search_messages' | 'trash_message' | 'list_labels';
 
@@ -109,9 +110,20 @@ const GmailConfig: React.FC<GmailConfigProps> = ({ initialData, onSave }) => {
     useEffect(() => {
         (async () => {
             try {
-                const data = await api<Credential[]>('/api/credentials?type=gmail', { method: 'GET' });
+                const [data, clientId, clientSecret] = await Promise.all([
+                    api<Credential[]>('/api/credentials?type=gmail', { method: 'GET' }),
+                    getSecret('google_oauth_client_id'),
+                    getSecret('google_oauth_client_secret'),
+                ]);
                 setCredentials(data);
                 if (data.length > 0 && !credentialId) setCredentialId(data[0].id);
+                if (clientId || clientSecret) {
+                    setNewCred((prev) => ({
+                        ...prev,
+                        clientId: clientId ?? prev.clientId,
+                        clientSecret: clientSecret ?? prev.clientSecret,
+                    }));
+                }
             } catch { /* ignore */ } finally { setLoadingCreds(false); }
         })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

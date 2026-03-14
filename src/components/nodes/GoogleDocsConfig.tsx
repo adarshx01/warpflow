@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, ChevronDown, ExternalLink, CheckCircle2, AlertCircle, Loader2, Play } from 'lucide-react';
 import { api } from '../../lib/api';
+import { getSecret } from '../../lib/secrets';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -298,9 +299,20 @@ const GoogleDocsConfig: React.FC<GoogleDocsConfigProps> = ({ initialData, onSave
     useEffect(() => {
         (async () => {
             try {
-                const data = await api<Credential[]>('/api/credentials?type=google-docs', { method: 'GET' });
+                const [data, clientId, clientSecret] = await Promise.all([
+                    api<Credential[]>('/api/credentials?type=google-docs', { method: 'GET' }),
+                    getSecret('google_oauth_client_id'),
+                    getSecret('google_oauth_client_secret'),
+                ]);
                 setCredentials(data);
                 if (data.length > 0 && !credentialId) setCredentialId(data[0].id);
+                if (clientId || clientSecret) {
+                    setNewCred((prev) => ({
+                        ...prev,
+                        clientId: clientId ?? prev.clientId,
+                        clientSecret: clientSecret ?? prev.clientSecret,
+                    }));
+                }
             } catch {
                 // backend may not have credentials endpoint yet — silently ignore
             } finally {

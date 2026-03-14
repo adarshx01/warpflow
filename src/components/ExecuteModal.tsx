@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Play, Loader2, CheckCircle2, AlertCircle, ChevronDown, Key, Eye, EyeOff } from 'lucide-react';
+import { X, Play, Loader2, CheckCircle2, AlertCircle, ChevronDown, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { api } from '../lib/api';
+import { checkSecretExists, type SecretKey } from '../lib/secrets';
 
 interface Node {
     id: string;
@@ -42,42 +43,60 @@ interface ModelInfo { id: string; name: string; description: string }
 const inputClass = 'w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all placeholder:text-slate-500';
 
 const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose }) => {
+    const agentNode = nodes.find((n) => n.type === 'ai-agent');
+    const configuredProvider = (agentNode?.data.aiProvider as 'gemini' | 'openai' | undefined) ?? 'gemini';
+    const configuredModel = (agentNode?.data.aiModel as string | undefined) ?? '';
+
     const [prompt, setPrompt] = useState('');
-    const [aiProvider, setAiProvider] = useState<'gemini' | 'openai'>('gemini');
-    const [apiKey, setApiKey] = useState('');
-    const [showKey, setShowKey] = useState(false);
-    const [model, setModel] = useState('');
+    const [aiProvider, setAiProvider] = useState<'gemini' | 'openai'>(configuredProvider);
+    const [model, setModel] = useState(configuredModel);
     const [models, setModels] = useState<ModelInfo[]>([]);
+    const [keyExists, setKeyExists] = useState(false);
     const [executing, setExecuting] = useState(false);
     const [result, setResult] = useState<ExecuteResult | null>(null);
     const [error, setError] = useState('');
 
-    // Fetch models when provider changes
+    const secretKeyForProvider = (provider: 'gemini' | 'openai'): SecretKey =>
+        provider === 'openai' ? 'agent_openai_api_key' : 'agent_gemini_api_key';
+
+    // Fetch models and check API key existence when provider changes
+    useEffect(() => {
+        checkSecretExists(secretKeyForProvider(aiProvider)).then(setKeyExists);
+    }, [aiProvider]);
+
     useEffect(() => {
         setModels([]);
-        setModel('');
         api<ModelInfo[]>(`/api/${aiProvider}/models`)
             .then((data) => {
                 setModels(data);
-                if (data.length > 0) setModel(data[0].id);
+                setModel((prev) => {
+                    if (configuredModel && data.some((m) => m.id === configuredModel)) {
+                        return configuredModel;
+                    }
+                    if (prev && data.some((m) => m.id === prev)) {
+                        return prev;
+                    }
+                    return data[0]?.id ?? '';
+                });
             })
             .catch(() => { /* fallback handled by empty list */ });
-    }, [aiProvider]);
+    }, [aiProvider, configuredModel]);
 
     // Check if there's an AI agent node
-    const hasAgentNode = nodes.some(n => n.type === 'ai-agent');
+    const hasAgentNode = Boolean(agentNode);
     const serviceNodes = nodes.filter(n =>
         ['google-docs', 'google-drive', 'gmail', 'google-sheets', 'google-forms'].includes(n.type)
     );
 
     const handleExecute = async () => {
-        if (!prompt.trim() || !apiKey.trim()) return;
+        if (!prompt.trim()) return;
 
         setExecuting(true);
         setError('');
         setResult(null);
 
         try {
+            // API key is fetched internally by the backend from the encrypted secrets store
             const res = await api<ExecuteResult>('/api/agent/execute', {
                 method: 'POST',
                 body: {
@@ -85,7 +104,6 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
                     connections: connections.map(c => ({ id: c.id, from: c.from, to: c.to })),
                     prompt,
                     ai_provider: aiProvider,
-                    ai_api_key: apiKey,
                     ai_model: model || undefined,
                 },
             });
@@ -163,6 +181,24 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
                         />
                     </div>
 
+                    {/* API Key Status */}
+                    {hasAgentNode && (
+                        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm ${
+                            keyExists
+                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                                : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                        }`}>
+                            {keyExists
+                                ? <ShieldCheck className="w-4 h-4 shrink-0" />
+                                : <ShieldAlert className="w-4 h-4 shrink-0" />}
+                            <span>
+                                {keyExists
+                                    ? `${aiProvider === 'gemini' ? 'Gemini' : 'OpenAI'} API key is configured. The backend will use it securely.`
+                                    : 'No API key found. Open the AI Agent node → Configure and save your API key first.'}
+                            </span>
+                        </div>
+                    )}
+
                     {/* AI Provider & Model */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -194,30 +230,6 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
                                 </select>
                                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
-                        </div>
-                    </div>
-
-                    {/* API Key */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                            <Key className="w-3.5 h-3.5 inline mr-1.5" />
-                            {aiProvider === 'gemini' ? 'Gemini' : 'OpenAI'} API Key
-                        </label>
-                        <div className="relative">
-                            <input
-                                type={showKey ? 'text' : 'password'}
-                                className={`${inputClass} pr-10`}
-                                placeholder={`Enter your ${aiProvider === 'gemini' ? 'Gemini' : 'OpenAI'} API key`}
-                                value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowKey(!showKey)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
-                            >
-                                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
                         </div>
                     </div>
 
@@ -282,7 +294,7 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
                     {!result && (
                         <button
                             onClick={handleExecute}
-                            disabled={executing || !prompt.trim() || !apiKey.trim() || !hasAgentNode}
+                            disabled={executing || !prompt.trim() || !hasAgentNode || !keyExists}
                             className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25"
                         >
                             {executing ? (

@@ -7,6 +7,7 @@ import GoogleSheetsConfig from './nodes/GoogleSheetsConfig';
 import GoogleFormsConfig from './nodes/GoogleFormsConfig';
 import OpenAIConfig from './nodes/OpenAIConfig';
 import GeminiConfig from './nodes/GeminiConfig';
+import AIAgentConfig from './nodes/AIAgentConfig';
 
 interface Node {
     id: string;
@@ -44,6 +45,8 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <OpenAIConfig initialData={node.data} onSave={handleSave} />;
             case 'gemini':
                 return <GeminiConfig initialData={node.data} onSave={handleSave} />;
+            case 'ai-agent':
+                return <AIAgentConfig initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
