@@ -42,11 +42,13 @@ class WorkflowEngine:
         user: User,
         nodes: list[dict[str, Any]],
         connections: list[dict[str, Any]],
+        workflow_id: str = "inline",
     ):
         self.db = db
         self.user = user
         self._nodes = nodes
         self._connections = connections
+        self._workflow_id = workflow_id
         self._tool_map: dict[str, tuple[Any, str]] = {}
         self._steps: list[dict] = []
 
@@ -110,7 +112,7 @@ class WorkflowEngine:
             )
 
         return {
-            "workflow_id": str(self.workflow.id),
+            "workflow_id": self._workflow_id,
             "status": "completed",
             "summary": summary,
             "steps": self._steps,

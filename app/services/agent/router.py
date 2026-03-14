@@ -52,6 +52,7 @@ async def execute_workflow(
         user=current_user,
         nodes=workflow.nodes or [],
         connections=workflow.connections or [],
+        workflow_id=str(workflow.id),
     )
     return await engine.execute(
         prompt=body.prompt,
@@ -75,6 +76,7 @@ async def execute_inline(
         user=current_user,
         nodes=body.nodes,
         connections=body.connections,
+        workflow_id="inline",
     )
     return await engine.execute(
         prompt=body.prompt,
