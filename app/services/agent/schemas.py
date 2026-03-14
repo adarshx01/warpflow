@@ -5,7 +5,8 @@ from typing import Any, Optional
 class ExecuteWorkflowRequest(BaseModel):
     prompt: str
     ai_provider: str = "gemini"
-    ai_api_key: str
+    # ai_api_key is no longer accepted from the frontend.
+    # The backend fetches the stored encrypted key automatically.
     ai_model: Optional[str] = None
 
 
@@ -15,7 +16,8 @@ class InlineExecuteRequest(BaseModel):
     connections: list[dict[str, Any]]
     prompt: str
     ai_provider: str = "gemini"
-    ai_api_key: str
+    # ai_api_key is no longer accepted from the frontend.
+    # The backend fetches the stored encrypted key automatically.
     ai_model: Optional[str] = None
 
 

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, Text, Float, ForeignKey, func
+from sqlalchemy import String, Boolean, DateTime, Text, Float, ForeignKey, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.database import Base
@@ -35,6 +35,9 @@ class User(Base):
     )
     credentials: Mapped[list["Credential"]] = relationship(
         "Credential", back_populates="owner", cascade="all, delete-orphan"
+    )
+    secrets: Mapped[list["UserSecret"]] = relationship(
+        "UserSecret", back_populates="owner", cascade="all, delete-orphan"
     )
 
 
@@ -107,3 +110,28 @@ class Credential(Base):
 
     # Relationships
     owner: Mapped["User"] = relationship("User", back_populates="credentials")
+
+
+class UserSecret(Base):
+    """Encrypted per-user key/value storage for reusable secrets."""
+    __tablename__ = "user_secrets"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "secret_key", name="uq_user_secret_owner_key"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    secret_key: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    owner: Mapped["User"] = relationship("User", back_populates="secrets")

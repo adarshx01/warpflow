@@ -6,9 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import User, Credential
+from app.models import User, Credential, UserSecret
 from app.auth.utils import get_current_user
 from app.schemas import CredentialCreate, CredentialResponse
+from app.security import encrypt_value
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +59,34 @@ async def create_credential(
         owner_id=current_user.id,
         type=body.type,
         name=body.name,
-        client_id=body.client_id,
-        client_secret=body.client_secret,
+        client_id=encrypt_value(body.client_id),
+        client_secret=encrypt_value(body.client_secret),
     )
     db.add(cred)
+
+    # Save Google OAuth app details once and reuse as defaults across Google nodes.
+    if body.type.startswith("google-"):
+        for key, plain_value in (
+            ("google_oauth_client_id", body.client_id),
+            ("google_oauth_client_secret", body.client_secret),
+        ):
+            stmt = select(UserSecret).where(
+                UserSecret.owner_id == current_user.id,
+                UserSecret.secret_key == key,
+            )
+            existing = (await db.execute(stmt)).scalar_one_or_none()
+            encrypted = encrypt_value(plain_value)
+            if existing:
+                existing.encrypted_value = encrypted
+            else:
+                db.add(
+                    UserSecret(
+                        owner_id=current_user.id,
+                        secret_key=key,
+                        encrypted_value=encrypted,
+                    )
+                )
+
     await db.commit()
     await db.refresh(cred)
     logger.info("Created credential %s for user %s", cred.id, current_user.id)

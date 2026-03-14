@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Credential
+from app.security import decrypt_value, encrypt_value
 
 logger = logging.getLogger(__name__)
 
@@ -39,29 +40,34 @@ async def get_user_credential(
 
 async def get_valid_access_token(credential: Credential, db: AsyncSession) -> str:
     """Return a valid access token, auto-refreshing if expired."""
-    if not credential.access_token:
+    access_token = decrypt_value(credential.access_token)
+    if not access_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google account not connected. Please complete OAuth flow.",
         )
 
     if credential.token_expiry and credential.token_expiry > datetime.now(timezone.utc):
-        return credential.access_token
+        return access_token
 
-    if not credential.refresh_token:
+    refresh_token = decrypt_value(credential.refresh_token)
+    if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google account not connected. Please complete OAuth flow.",
         )
+
+    client_id = decrypt_value(credential.client_id)
+    client_secret = decrypt_value(credential.client_secret)
 
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(
                 GOOGLE_TOKEN_URL,
                 data={
-                    "client_id": credential.client_id,
-                    "client_secret": credential.client_secret,
-                    "refresh_token": credential.refresh_token,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "refresh_token": refresh_token,
                     "grant_type": "refresh_token",
                 },
             )
@@ -74,11 +80,11 @@ async def get_valid_access_token(credential: Credential, db: AsyncSession) -> st
             )
 
     token_data = resp.json()
-    credential.access_token = token_data["access_token"]
+    credential.access_token = encrypt_value(token_data["access_token"])
     expires_in = token_data.get("expires_in", 3600)
     credential.token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
     await db.commit()
-    return credential.access_token
+    return token_data["access_token"]
 
 
 def auth_headers(token: str) -> dict:
@@ -104,8 +110,10 @@ async def google_oauth_start(
     """Build Google OAuth consent screen URL."""
     from urllib.parse import urlencode
 
+    client_id = decrypt_value(credential.client_id)
+
     params = {
-        "client_id": credential.client_id,
+        "client_id": client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": " ".join(scopes),
@@ -135,14 +143,17 @@ async def google_oauth_callback(
     if not cred:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential not found")
 
+    client_id = decrypt_value(cred.client_id)
+    client_secret = decrypt_value(cred.client_secret)
+
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(
                 GOOGLE_TOKEN_URL,
                 data={
                     "code": code,
-                    "client_id": cred.client_id,
-                    "client_secret": cred.client_secret,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
                     "redirect_uri": redirect_uri,
                     "grant_type": "authorization_code",
                 },
@@ -156,8 +167,10 @@ async def google_oauth_callback(
             )
 
     token_data = resp.json()
-    cred.access_token = token_data["access_token"]
-    cred.refresh_token = token_data.get("refresh_token", cred.refresh_token)
+    cred.access_token = encrypt_value(token_data["access_token"])
+    new_refresh_token = token_data.get("refresh_token")
+    if new_refresh_token:
+        cred.refresh_token = encrypt_value(new_refresh_token)
     expires_in = token_data.get("expires_in", 3600)
     cred.token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
     await db.commit()

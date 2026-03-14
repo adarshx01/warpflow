@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     # JWT
     SECRET_KEY: str
+    SECRETS_ENCRYPTION_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
 
