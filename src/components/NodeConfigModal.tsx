@@ -8,6 +8,10 @@ import GoogleFormsConfig from './nodes/GoogleFormsConfig';
 import OpenAIConfig from './nodes/OpenAIConfig';
 import GeminiConfig from './nodes/GeminiConfig';
 import AIAgentConfig from './nodes/AIAgentConfig';
+import ManualTriggerConfig from './nodes/ManualTriggerConfig';
+import ScheduleConfig from './nodes/ScheduleConfig';
+import WebhookConfig from './nodes/WebhookConfig';
+import EmailTriggerConfig from './nodes/EmailTriggerConfig';
 
 interface Node {
     id: string;
@@ -47,6 +51,14 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <GeminiConfig initialData={node.data} onSave={handleSave} />;
             case 'ai-agent':
                 return <AIAgentConfig initialData={node.data} onSave={handleSave} />;
+            case 'manual-trigger':
+                return <ManualTriggerConfig initialData={node.data} onSave={handleSave} />;
+            case 'schedule':
+                return <ScheduleConfig initialData={node.data} onSave={handleSave} />;
+            case 'webhook':
+                return <WebhookConfig initialData={node.data} onSave={handleSave} nodeId={node.id} />;
+            case 'email-trigger':
+                return <EmailTriggerConfig initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
