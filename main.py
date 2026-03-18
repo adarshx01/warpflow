@@ -12,8 +12,6 @@ from app.database import engine, Base, async_session
 from app.rate_limit import limiter
 from app.auth.router import router as auth_router
 from app.workflows.router import router as workflows_router, templates_router
-from app.workflows.execution import router as execution_router
-from app.webhooks.router import router as webhooks_router
 from app.services.google.google_docs.router import router as google_docs_router
 from app.services.credentials_router import router as credentials_router
 from app.services.google.google_drive.router import router as google_drive_router
@@ -24,8 +22,6 @@ from app.services.ai.openai_service.router import router as openai_router
 from app.services.ai.gemini_service.router import router as gemini_router
 from app.services.agent.router import router as agent_router
 from app.services.secrets_router import router as secrets_router
-from app.services.scheduler import init_schedules, start_scheduler, stop_scheduler
-from app.services.triggers.email_poller import start_email_poller, stop_email_poller
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -39,16 +35,8 @@ async def lifespan(app: FastAPI):
 
     # Seed node templates
     await _seed_node_templates()
-    
-    # Start and load schedules
-    start_scheduler()
-    await init_schedules()
-    start_email_poller()
 
     yield
-    
-    await stop_email_poller()
-    stop_scheduler()
     await engine.dispose()
 
 
@@ -102,8 +90,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Routers
 app.include_router(auth_router)
 app.include_router(workflows_router)
-app.include_router(execution_router)
-app.include_router(webhooks_router)
 app.include_router(templates_router)
 app.include_router(credentials_router)
 app.include_router(google_docs_router)
