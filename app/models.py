@@ -135,3 +135,101 @@ class UserSecret(Base):
     )
 
     owner: Mapped["User"] = relationship("User", back_populates="secrets")
+
+
+class MLDataset(Base):
+    """Stores metadata for uploaded ML datasets."""
+    __tablename__ = "ml_datasets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    s3_path: Mapped[str] = mapped_column(Text, nullable=False)
+    file_type: Mapped[str] = mapped_column(String(10), nullable=False)  # csv, json
+    row_count: Mapped[int] = mapped_column(nullable=False)
+    columns: Mapped[dict] = mapped_column(JSONB, nullable=False)  # [{name, dtype}, ...]
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    owner: Mapped["User"] = relationship("User")
+
+
+class MLModel(Base):
+    """Stores metadata for trained ML models."""
+    __tablename__ = "ml_models"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ml_datasets.id", ondelete="SET NULL"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    algorithm: Mapped[str] = mapped_column(String(50), nullable=False)
+    model_type: Mapped[str] = mapped_column(String(50), nullable=False)  # classification, regression, clustering, dimensionality_reduction
+    model_category: Mapped[str | None] = mapped_column(String(20), nullable=True)  # supervised, unsupervised
+    s3_path: Mapped[str] = mapped_column(Text, nullable=False)
+    metrics: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    feature_names: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    hyperparameters: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    owner: Mapped["User"] = relationship("User")
+    dataset: Mapped["MLDataset"] = relationship("MLDataset")
+
+
+class ContextCollection(Base):
+    """Stores metadata for vector store collections."""
+    __tablename__ = "context_collections"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "name", name="uq_context_collection_owner_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    document_count: Mapped[int] = mapped_column(default=0)
+    chunk_count: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    owner: Mapped["User"] = relationship("User")
+
+
+class ContextDocument(Base):
+    """Stores metadata for documents in vector store."""
+    __tablename__ = "context_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("context_collections.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_type: Mapped[str] = mapped_column(String(10), nullable=False)  # pdf, txt, md
+    chunk_count: Mapped[int] = mapped_column(nullable=False)
+    s3_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    collection: Mapped["ContextCollection"] = relationship("ContextCollection")

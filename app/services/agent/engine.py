@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
 from app.services.google.common import get_user_credential, get_valid_access_token
-from app.services.agent.tools import TOOL_REGISTRY
+from app.services.agent.tools import TOOL_REGISTRY, CREDENTIAL_LESS_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,14 @@ class WorkflowEngine:
             if node_type in registered_types or node_type not in TOOL_REGISTRY:
                 continue
 
+            # Handle credential-less tools (ML, Context Store)
+            if node_type in CREDENTIAL_LESS_TOOLS:
+                for tool_def in TOOL_REGISTRY[node_type]:
+                    # Pass user_id instead of OAuth token, and db session
+                    self._tool_map[tool_def["name"]] = (tool_def["_fn"], str(self.user.id))
+                registered_types.add(node_type)
+                continue
+
             node_data = node.get("data", {})
             credential_id = node_data.get("credentialId")
 
@@ -178,7 +186,11 @@ class WorkflowEngine:
 
         fn, token = self._tool_map[tool_name]
         try:
-            result = await fn(token, args)
+            # Credential-less tools (ML, Context) need db session
+            if tool_name.startswith("ml_") or tool_name.startswith("context_"):
+                result = await fn(token, args, self.db)
+            else:
+                result = await fn(token, args)
             self._steps.append({"tool": tool_name, "params": args, "result": result})
             return result
         except HTTPException as exc:

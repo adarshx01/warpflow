@@ -25,8 +25,28 @@ from app.services.google.google_forms.router import (
     create_form, get_form, list_responses,
     get_response as get_form_response, update_form,
 )
+from app.services.ml.router import (
+    ml_upload_dataset, ml_train_model, ml_predict,
+    ml_get_model_info, ml_list_models, ml_list_datasets,
+    ml_analyze_dataset, ml_preview_dataset,
+    ml_train_supervised, ml_train_unsupervised,
+)
+from app.services.context.router import (
+    context_upload_document, context_query, context_list_documents,
+    context_delete_document, context_clear_collection, context_list_collections,
+)
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
+
+# Tools that don't require OAuth credentials (use user_id instead)
+CREDENTIAL_LESS_TOOLS = {
+    "ml-trainer",  # Legacy
+    "data-prep",
+    "supervised-train",
+    "unsupervised-train",
+    "model-inference",
+    "context-store",
+}
 
 
 # Wrapper for auto-confirming destructive operations
@@ -444,6 +464,418 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "required": ["formId"],
             },
             "_fn": update_form,
+        },
+    ],
+    "ml-trainer": [
+        {
+            "name": "ml_upload_dataset",
+            "description": "Upload a CSV or JSON dataset for ML training",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_content": {"type": "string", "description": "Base64-encoded file content"},
+                    "filename": {"type": "string", "description": "Original filename"},
+                    "file_type": {"type": "string", "enum": ["csv", "json"], "description": "File format"},
+                },
+                "required": ["file_content", "filename", "file_type"],
+            },
+            "_fn": ml_upload_dataset,
+        },
+        {
+            "name": "ml_train_model",
+            "description": "Train a machine learning model on a dataset",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "string", "description": "ID of the dataset to train on"},
+                    "algorithm": {
+                        "type": "string",
+                        "enum": [
+                            "logistic_regression", "random_forest_classifier", "svm_classifier",
+                            "gradient_boosting_classifier", "adaboost_classifier", "catboost_classifier",
+                            "linear_regression", "random_forest_regressor", "svm_regressor",
+                            "gradient_boosting_regressor", "adaboost_regressor", "catboost_regressor",
+                            "kmeans", "dbscan", "pca"
+                        ],
+                        "description": "ML algorithm to use",
+                    },
+                    "model_type": {
+                        "type": "string",
+                        "enum": ["classification", "regression", "clustering", "dimensionality_reduction"],
+                        "description": "Type of ML task",
+                    },
+                    "target_column": {"type": "string", "description": "Target column for supervised learning"},
+                    "feature_columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Feature columns to use (optional, uses all if not specified)",
+                    },
+                    "name": {"type": "string", "description": "Optional name for the model"},
+                },
+                "required": ["dataset_id", "algorithm", "model_type"],
+            },
+            "_fn": ml_train_model,
+        },
+        {
+            "name": "ml_predict",
+            "description": "Run predictions using a trained model",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "ID of the trained model"},
+                    "input_data": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Input data as array of objects",
+                    },
+                },
+                "required": ["model_id", "input_data"],
+            },
+            "_fn": ml_predict,
+        },
+        {
+            "name": "ml_get_model_info",
+            "description": "Get information and metrics about a trained model",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "ID of the model"},
+                },
+                "required": ["model_id"],
+            },
+            "_fn": ml_get_model_info,
+        },
+        {
+            "name": "ml_list_models",
+            "description": "List all trained models",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": ml_list_models,
+        },
+        {
+            "name": "ml_list_datasets",
+            "description": "List all uploaded datasets",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": ml_list_datasets,
+        },
+    ],
+    # New ML node types
+    "data-prep": [
+        {
+            "name": "ml_upload_dataset",
+            "description": "Upload a CSV or JSON dataset for ML training",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_content": {"type": "string", "description": "Base64-encoded file content"},
+                    "filename": {"type": "string", "description": "Original filename"},
+                    "file_type": {"type": "string", "enum": ["csv", "json"], "description": "File format"},
+                },
+                "required": ["file_content", "filename", "file_type"],
+            },
+            "_fn": ml_upload_dataset,
+        },
+        {
+            "name": "ml_analyze_dataset",
+            "description": "Analyze a dataset to get column types (numeric/categorical), statistics, and missing value info. Always run this after uploading to understand your data.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "string", "description": "ID of the dataset to analyze"},
+                },
+                "required": ["dataset_id"],
+            },
+            "_fn": ml_analyze_dataset,
+        },
+        {
+            "name": "ml_preview_dataset",
+            "description": "Get a preview of the dataset rows",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "string", "description": "ID of the dataset"},
+                    "n_rows": {"type": "integer", "description": "Number of rows to preview (default 10)"},
+                },
+                "required": ["dataset_id"],
+            },
+            "_fn": ml_preview_dataset,
+        },
+        {
+            "name": "ml_list_datasets",
+            "description": "List all uploaded datasets",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": ml_list_datasets,
+        },
+    ],
+    "supervised-train": [
+        {
+            "name": "ml_train_supervised",
+            "description": "Train a supervised learning model (classification or regression). Supports algorithms: logistic_regression, random_forest_classifier, svm_classifier, gradient_boosting_classifier, adaboost_classifier, catboost_classifier for classification; linear_regression, random_forest_regressor, svm_regressor, gradient_boosting_regressor, adaboost_regressor, catboost_regressor for regression.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "string", "description": "ID of the dataset to train on"},
+                    "algorithm": {
+                        "type": "string",
+                        "enum": [
+                            "logistic_regression", "random_forest_classifier", "svm_classifier",
+                            "gradient_boosting_classifier", "adaboost_classifier", "catboost_classifier",
+                            "linear_regression", "random_forest_regressor", "svm_regressor",
+                            "gradient_boosting_regressor", "adaboost_regressor", "catboost_regressor"
+                        ],
+                        "description": "ML algorithm to use",
+                    },
+                    "target_column": {"type": "string", "description": "Target column for prediction (required)"},
+                    "feature_columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Feature columns to use (optional, uses all numeric columns if not specified)",
+                    },
+                    "model_name": {"type": "string", "description": "Optional name for the model"},
+                    "preprocessing": {
+                        "type": "object",
+                        "description": "Preprocessing configuration",
+                        "properties": {
+                            "normalization": {
+                                "type": "string",
+                                "enum": ["standard", "minmax", "robust", "none"],
+                                "description": "Normalization method (default: standard)",
+                            },
+                            "handle_missing": {
+                                "type": "string",
+                                "enum": ["drop", "mean", "median", "mode", "zero"],
+                                "description": "How to handle missing values (default: zero)",
+                            },
+                            "train_size": {"type": "number", "description": "Training set proportion (default: 0.7)"},
+                            "val_size": {"type": "number", "description": "Validation set proportion (default: 0.15)"},
+                            "test_size": {"type": "number", "description": "Test set proportion (default: 0.15)"},
+                        },
+                    },
+                },
+                "required": ["dataset_id", "algorithm", "target_column"],
+            },
+            "_fn": ml_train_supervised,
+        },
+        {
+            "name": "ml_list_models",
+            "description": "List all trained models",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": ml_list_models,
+        },
+        {
+            "name": "ml_get_model_info",
+            "description": "Get information and metrics about a trained model",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "ID of the model"},
+                },
+                "required": ["model_id"],
+            },
+            "_fn": ml_get_model_info,
+        },
+    ],
+    "unsupervised-train": [
+        {
+            "name": "ml_train_unsupervised",
+            "description": "Train an unsupervised learning model (clustering or dimensionality reduction). Supports algorithms: kmeans, dbscan for clustering; pca for dimensionality reduction.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "string", "description": "ID of the dataset to train on"},
+                    "algorithm": {
+                        "type": "string",
+                        "enum": ["kmeans", "dbscan", "pca"],
+                        "description": "ML algorithm to use",
+                    },
+                    "feature_columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Feature columns to use (optional, uses all numeric columns if not specified)",
+                    },
+                    "model_name": {"type": "string", "description": "Optional name for the model"},
+                    "preprocessing": {
+                        "type": "object",
+                        "description": "Preprocessing configuration",
+                        "properties": {
+                            "normalization": {
+                                "type": "string",
+                                "enum": ["standard", "minmax", "robust", "none"],
+                                "description": "Normalization method (default: standard)",
+                            },
+                            "handle_missing": {
+                                "type": "string",
+                                "enum": ["drop", "mean", "median", "mode", "zero"],
+                                "description": "How to handle missing values (default: zero)",
+                            },
+                        },
+                    },
+                    "hyperparameters": {
+                        "type": "object",
+                        "description": "Algorithm-specific hyperparameters (e.g., n_clusters for kmeans)",
+                    },
+                },
+                "required": ["dataset_id", "algorithm"],
+            },
+            "_fn": ml_train_unsupervised,
+        },
+        {
+            "name": "ml_list_models",
+            "description": "List all trained models",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": ml_list_models,
+        },
+        {
+            "name": "ml_get_model_info",
+            "description": "Get information and metrics about a trained model",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "ID of the model"},
+                },
+                "required": ["model_id"],
+            },
+            "_fn": ml_get_model_info,
+        },
+    ],
+    "model-inference": [
+        {
+            "name": "ml_predict",
+            "description": "Run predictions using a trained model",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "ID of the trained model"},
+                    "input_data": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Input data as array of objects with feature values",
+                    },
+                },
+                "required": ["model_id", "input_data"],
+            },
+            "_fn": ml_predict,
+        },
+        {
+            "name": "ml_list_models",
+            "description": "List all trained models available for inference",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": ml_list_models,
+        },
+        {
+            "name": "ml_get_model_info",
+            "description": "Get information and metrics about a trained model",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "ID of the model"},
+                },
+                "required": ["model_id"],
+            },
+            "_fn": ml_get_model_info,
+        },
+    ],
+    "context-store": [
+        {
+            "name": "context_upload_document",
+            "description": "Upload a PDF or text document to the vector store for semantic search",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "collection_name": {"type": "string", "description": "Name of the collection to add to"},
+                    "file_content": {"type": "string", "description": "Base64-encoded file content"},
+                    "filename": {"type": "string", "description": "Original filename"},
+                    "file_type": {"type": "string", "enum": ["pdf", "txt", "md"], "description": "File format"},
+                    "chunk_size": {"type": "integer", "description": "Characters per chunk (default 500)"},
+                    "chunk_overlap": {"type": "integer", "description": "Overlap between chunks (default 50)"},
+                },
+                "required": ["collection_name", "file_content", "filename", "file_type"],
+            },
+            "_fn": context_upload_document,
+        },
+        {
+            "name": "context_query",
+            "description": "Search the vector store for relevant context using semantic similarity",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "collection_name": {"type": "string", "description": "Name of the collection to search"},
+                    "query_text": {"type": "string", "description": "Search query"},
+                    "top_k": {"type": "integer", "description": "Number of results to return (default 5)"},
+                },
+                "required": ["collection_name", "query_text"],
+            },
+            "_fn": context_query,
+        },
+        {
+            "name": "context_list_documents",
+            "description": "List all documents in a vector store collection",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "collection_name": {"type": "string", "description": "Name of the collection"},
+                },
+                "required": ["collection_name"],
+            },
+            "_fn": context_list_documents,
+        },
+        {
+            "name": "context_delete_document",
+            "description": "Remove a document from the vector store",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "collection_name": {"type": "string", "description": "Name of the collection"},
+                    "document_id": {"type": "string", "description": "ID of the document to delete"},
+                },
+                "required": ["collection_name", "document_id"],
+            },
+            "_fn": context_delete_document,
+        },
+        {
+            "name": "context_clear_collection",
+            "description": "Clear all documents from a vector store collection",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "collection_name": {"type": "string", "description": "Name of the collection to clear"},
+                },
+                "required": ["collection_name"],
+            },
+            "_fn": context_clear_collection,
+        },
+        {
+            "name": "context_list_collections",
+            "description": "List all vector store collections",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": context_list_collections,
         },
     ],
 }

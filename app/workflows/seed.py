@@ -16,6 +16,8 @@ NODE_TEMPLATES = [
     {"id": "huggingface",     "name": "HuggingFace",        "icon": "🤗",  "color": "from-yellow-400 via-orange-400 to-amber-500",   "category": "AI & ML",          "description": "Run inference on HuggingFace models"},
     {"id": "gemini",          "name": "Google Gemini",      "icon": "✨",  "color": "from-blue-400 via-purple-400 to-pink-500",      "category": "AI & ML",          "description": "Generate content and chat with Google Gemini AI models"},
     {"id": "ai-agent",        "name": "AI Agent",           "icon": "👾",  "color": "from-purple-400 via-fuchsia-400 to-pink-500",   "category": "AI & ML",          "description": "Autonomous AI agent with tool use"},
+    {"id": "ml-trainer",      "name": "ML Trainer",         "icon": "🎯",  "color": "from-violet-400 via-purple-400 to-indigo-500",  "category": "AI & ML",          "description": "Train ML models and run predictions with scikit-learn"},
+    {"id": "context-store",   "name": "Context Store",      "icon": "📚",  "color": "from-amber-400 via-orange-400 to-red-500",      "category": "AI & ML",          "description": "Vector store for RAG - semantic search over documents"},
     {"id": "text-analysis",   "name": "Text Analysis",      "icon": "📝",  "color": "from-blue-400 via-cyan-400 to-teal-500",        "category": "AI & ML",          "description": "Sentiment, classification, NER and more"},
     {"id": "image-gen",       "name": "Image Generation",   "icon": "🎨",  "color": "from-pink-400 via-purple-400 to-indigo-500",    "category": "AI & ML",          "description": "Generate images from text prompts"},
 
