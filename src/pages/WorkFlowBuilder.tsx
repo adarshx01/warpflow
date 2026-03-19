@@ -42,8 +42,15 @@ const nodeTypes: NodeType[] = [
   { id: 'anthropic', name: 'Anthropic Claude', icon: '🤖', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'AI & ML' },
   { id: 'huggingface', name: 'HuggingFace', icon: '🤗', color: 'from-yellow-400 via-orange-400 to-amber-500', category: 'AI & ML' },
   { id: 'ai-agent', name: 'AI Agent', icon: '👾', color: 'from-purple-400 via-fuchsia-400 to-pink-500', category: 'AI & ML' },
+  { id: 'context-store', name: 'Context Store', icon: '📚', color: 'from-amber-400 via-orange-400 to-red-500', category: 'AI & ML' },
   { id: 'text-analysis', name: 'Text Analysis', icon: '📝', color: 'from-blue-400 via-cyan-400 to-teal-500', category: 'AI & ML' },
   { id: 'image-gen', name: 'Image Generation', icon: '🎨', color: 'from-pink-400 via-purple-400 to-indigo-500', category: 'AI & ML' },
+
+  // ML Training & Inference
+  { id: 'data-prep', name: 'Data Preparation', icon: '📊', color: 'from-blue-400 via-cyan-400 to-emerald-500', category: 'ML Training' },
+  { id: 'supervised-train', name: 'Supervised Training', icon: '🎯', color: 'from-violet-400 via-purple-400 to-fuchsia-500', category: 'ML Training' },
+  { id: 'unsupervised-train', name: 'Unsupervised Training', icon: '🔮', color: 'from-amber-400 via-yellow-400 to-lime-500', category: 'ML Training' },
+  { id: 'model-inference', name: 'Model Inference', icon: '⚡', color: 'from-red-400 via-orange-400 to-amber-500', category: 'ML Training' },
 
   // Communication
   { id: 'slack', name: 'Slack', icon: '💬', color: 'from-purple-400 via-pink-400 to-rose-500', category: 'Communication' },

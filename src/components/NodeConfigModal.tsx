@@ -8,6 +8,12 @@ import GoogleFormsConfig from './nodes/GoogleFormsConfig';
 import OpenAIConfig from './nodes/OpenAIConfig';
 import GeminiConfig from './nodes/GeminiConfig';
 import AIAgentConfig from './nodes/AIAgentConfig';
+import ContextStoreConfig from './nodes/ContextStoreConfig';
+// ML Training nodes
+import DataPrepConfig from './nodes/DataPrepConfig';
+import SupervisedTrainConfig from './nodes/SupervisedTrainConfig';
+import UnsupervisedTrainConfig from './nodes/UnsupervisedTrainConfig';
+import ModelInferenceConfig from './nodes/ModelInferenceConfig';
 
 interface Node {
     id: string;
@@ -47,6 +53,17 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <GeminiConfig initialData={node.data} onSave={handleSave} />;
             case 'ai-agent':
                 return <AIAgentConfig initialData={node.data} onSave={handleSave} />;
+            case 'context-store':
+                return <ContextStoreConfig initialData={node.data} onSave={handleSave} />;
+            // ML Training nodes
+            case 'data-prep':
+                return <DataPrepConfig initialData={node.data} onSave={handleSave} />;
+            case 'supervised-train':
+                return <SupervisedTrainConfig initialData={node.data} onSave={handleSave} />;
+            case 'unsupervised-train':
+                return <UnsupervisedTrainConfig initialData={node.data} onSave={handleSave} />;
+            case 'model-inference':
+                return <ModelInferenceConfig initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
