@@ -25,6 +25,16 @@ from app.services.google.google_forms.router import (
     create_form, get_form, list_responses,
     get_response as get_form_response, update_form,
 )
+from app.services.slack.service import (
+    slack_send_message, slack_update_message, slack_delete_message, slack_get_permalink,
+    slack_list_channels, slack_get_channel_info, slack_get_channel_history,
+    slack_get_thread_replies, slack_invite_to_channel, slack_create_channel, slack_archive_channel,
+    slack_list_users, slack_get_user_info, slack_lookup_user_by_email, slack_set_user_status,
+    slack_add_reaction, slack_remove_reaction, slack_get_reactions,
+    slack_upload_file, slack_list_files, slack_delete_file,
+    slack_pin_message, slack_unpin_message, slack_list_pins,
+    slack_search_messages, slack_get_workspace_info, slack_get_bot_info, slack_add_reminder,
+)
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
@@ -444,6 +454,254 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "required": ["formId"],
             },
             "_fn": update_form,
+        },
+    ],
+    "slack": [
+        {
+            "name": "slack_send_message",
+            "description": "Send a message to a Slack channel or user. Supports text, blocks, and thread replies.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID or name (e.g. #general or C012AB3CD)"},
+                "text": {"type": "string", "description": "Message text (supports Slack mrkdwn)"},
+                "thread_ts": {"type": "string", "description": "Thread timestamp to reply in a thread"},
+                "username": {"type": "string", "description": "Custom bot display name"},
+                "icon_emoji": {"type": "string", "description": "Emoji to use as icon (e.g. :robot_face:)"},
+            }, "required": ["channel", "text"]},
+            "_fn": slack_send_message,
+        },
+        {
+            "name": "slack_update_message",
+            "description": "Update the content of an existing Slack message.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel containing the message"},
+                "ts": {"type": "string", "description": "Timestamp of the message to update"},
+                "text": {"type": "string", "description": "New message text"},
+            }, "required": ["channel", "ts", "text"]},
+            "_fn": slack_update_message,
+        },
+        {
+            "name": "slack_delete_message",
+            "description": "Delete a message from a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "ts": {"type": "string", "description": "Timestamp of the message to delete"},
+            }, "required": ["channel", "ts"]},
+            "_fn": slack_delete_message,
+        },
+        {
+            "name": "slack_get_permalink",
+            "description": "Get a permanent link URL to a specific Slack message.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "message_ts": {"type": "string", "description": "Timestamp of the message"},
+            }, "required": ["channel", "message_ts"]},
+            "_fn": slack_get_permalink,
+        },
+        {
+            "name": "slack_list_channels",
+            "description": "List all public and private channels in the Slack workspace.",
+            "parameters": {"type": "object", "properties": {
+                "limit": {"type": "integer", "description": "Max channels to return (default 100)"},
+                "types": {"type": "string", "description": "Channel types: public_channel, private_channel, mpim, im"},
+                "exclude_archived": {"type": "boolean", "description": "Exclude archived channels"},
+            }, "required": []},
+            "_fn": slack_list_channels,
+        },
+        {
+            "name": "slack_get_channel_info",
+            "description": "Get detailed information about a specific Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+            }, "required": ["channel"]},
+            "_fn": slack_get_channel_info,
+        },
+        {
+            "name": "slack_get_channel_history",
+            "description": "Retrieve recent messages from a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "limit": {"type": "integer", "description": "Number of messages to return"},
+                "oldest": {"type": "string", "description": "Start of time range (Unix timestamp)"},
+                "latest": {"type": "string", "description": "End of time range (Unix timestamp)"},
+            }, "required": ["channel"]},
+            "_fn": slack_get_channel_history,
+        },
+        {
+            "name": "slack_get_thread_replies",
+            "description": "Get all replies in a message thread.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "ts": {"type": "string", "description": "Timestamp of the parent message"},
+                "limit": {"type": "integer", "description": "Max replies to return"},
+            }, "required": ["channel", "ts"]},
+            "_fn": slack_get_thread_replies,
+        },
+        {
+            "name": "slack_create_channel",
+            "description": "Create a new Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "name": {"type": "string", "description": "Channel name (lowercase, no spaces)"},
+                "is_private": {"type": "boolean", "description": "Whether the channel should be private"},
+            }, "required": ["name"]},
+            "_fn": slack_create_channel,
+        },
+        {
+            "name": "slack_invite_to_channel",
+            "description": "Invite one or more users to a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "users": {"type": "string", "description": "Comma-separated user IDs to invite"},
+            }, "required": ["channel", "users"]},
+            "_fn": slack_invite_to_channel,
+        },
+        {
+            "name": "slack_archive_channel",
+            "description": "Archive a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID to archive"},
+            }, "required": ["channel"]},
+            "_fn": slack_archive_channel,
+        },
+        {
+            "name": "slack_list_users",
+            "description": "List all members of the Slack workspace.",
+            "parameters": {"type": "object", "properties": {
+                "limit": {"type": "integer", "description": "Max users to return"},
+            }, "required": []},
+            "_fn": slack_list_users,
+        },
+        {
+            "name": "slack_get_user_info",
+            "description": "Get profile information about a specific Slack user.",
+            "parameters": {"type": "object", "properties": {
+                "user": {"type": "string", "description": "User ID (e.g. U012AB3CD)"},
+            }, "required": ["user"]},
+            "_fn": slack_get_user_info,
+        },
+        {
+            "name": "slack_lookup_user_by_email",
+            "description": "Find a Slack user by their email address.",
+            "parameters": {"type": "object", "properties": {
+                "email": {"type": "string", "description": "Email address to look up"},
+            }, "required": ["email"]},
+            "_fn": slack_lookup_user_by_email,
+        },
+        {
+            "name": "slack_add_reaction",
+            "description": "Add an emoji reaction to a Slack message.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "timestamp": {"type": "string", "description": "Message timestamp"},
+                "name": {"type": "string", "description": "Emoji name without colons (e.g. thumbsup)"},
+            }, "required": ["channel", "timestamp", "name"]},
+            "_fn": slack_add_reaction,
+        },
+        {
+            "name": "slack_remove_reaction",
+            "description": "Remove an emoji reaction from a Slack message.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "timestamp": {"type": "string", "description": "Message timestamp"},
+                "name": {"type": "string", "description": "Emoji name to remove"},
+            }, "required": ["channel", "timestamp", "name"]},
+            "_fn": slack_remove_reaction,
+        },
+        {
+            "name": "slack_get_reactions",
+            "description": "Get all emoji reactions on a Slack message.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "timestamp": {"type": "string", "description": "Message timestamp"},
+            }, "required": ["channel", "timestamp"]},
+            "_fn": slack_get_reactions,
+        },
+        {
+            "name": "slack_upload_file",
+            "description": "Upload a text file or snippet to Slack.",
+            "parameters": {"type": "object", "properties": {
+                "content": {"type": "string", "description": "Text content of the file"},
+                "filename": {"type": "string", "description": "Filename (e.g. report.txt)"},
+                "title": {"type": "string", "description": "Display title of the file"},
+                "channels": {"type": "string", "description": "Comma-separated channel IDs to share the file in"},
+                "initial_comment": {"type": "string", "description": "Message to accompany the file"},
+            }, "required": ["content"]},
+            "_fn": slack_upload_file,
+        },
+        {
+            "name": "slack_list_files",
+            "description": "List files shared in the Slack workspace.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Filter files by channel"},
+                "count": {"type": "integer", "description": "Number of files to return"},
+                "types": {"type": "string", "description": "File types: all, spaces, snippets, images, gdocs, zips, pdfs"},
+            }, "required": []},
+            "_fn": slack_list_files,
+        },
+        {
+            "name": "slack_delete_file",
+            "description": "Delete a file from Slack.",
+            "parameters": {"type": "object", "properties": {
+                "file": {"type": "string", "description": "File ID to delete"},
+            }, "required": ["file"]},
+            "_fn": slack_delete_file,
+        },
+        {
+            "name": "slack_pin_message",
+            "description": "Pin a message to a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "timestamp": {"type": "string", "description": "Message timestamp to pin"},
+            }, "required": ["channel", "timestamp"]},
+            "_fn": slack_pin_message,
+        },
+        {
+            "name": "slack_unpin_message",
+            "description": "Unpin a message from a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "timestamp": {"type": "string", "description": "Message timestamp to unpin"},
+            }, "required": ["channel", "timestamp"]},
+            "_fn": slack_unpin_message,
+        },
+        {
+            "name": "slack_list_pins",
+            "description": "List all pinned items in a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+            }, "required": ["channel"]},
+            "_fn": slack_list_pins,
+        },
+        {
+            "name": "slack_search_messages",
+            "description": "Search for messages in Slack matching a query.",
+            "parameters": {"type": "object", "properties": {
+                "query": {"type": "string", "description": "Search query string"},
+                "count": {"type": "integer", "description": "Number of results to return"},
+                "sort": {"type": "string", "description": "Sort by: score or timestamp"},
+            }, "required": ["query"]},
+            "_fn": slack_search_messages,
+        },
+        {
+            "name": "slack_get_workspace_info",
+            "description": "Get information about the Slack workspace (team name, domain, etc).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+            "_fn": slack_get_workspace_info,
+        },
+        {
+            "name": "slack_get_bot_info",
+            "description": "Get information about the authenticated Slack bot (auth.test).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+            "_fn": slack_get_bot_info,
+        },
+        {
+            "name": "slack_add_reminder",
+            "description": "Create a reminder for a user in Slack.",
+            "parameters": {"type": "object", "properties": {
+                "text": {"type": "string", "description": "Reminder message"},
+                "time": {"type": "string", "description": "When to send: Unix timestamp or natural language like 'in 30 minutes'"},
+                "user": {"type": "string", "description": "User ID to remind (defaults to bot user)"},
+            }, "required": ["text", "time"]},
+            "_fn": slack_add_reminder,
         },
     ],
 }

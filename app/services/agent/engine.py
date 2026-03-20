@@ -133,10 +133,20 @@ class WorkflowEngine:
             credential_id = node_data.get("credentialId")
 
             if not credential_id:
-                logger.warning(
-                    "Node %s (%s) has no credentialId configured, skipping",
-                    node.get("id"), node_type,
-                )
+                # Special case: Slack uses a bot token from node.data directly
+                if node_type == "slack":
+                    token = node.get("_slack_token", "") or node_data.get("botToken", "")
+                    if token:
+                        for tool_def in TOOL_REGISTRY[node_type]:
+                            self._tool_map[tool_def["name"]] = (tool_def["_fn"], token)
+                        registered_types.add(node_type)
+                    else:
+                        logger.warning("Slack node has no botToken configured, skipping")
+                else:
+                    logger.warning(
+                        "Node %s (%s) has no credentialId configured, skipping",
+                        node.get("id"), node_type,
+                    )
                 continue
 
             try:

@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-settings>=2.13.1",
     "python-dotenv>=1.2.1",
     "python-jose[cryptography]>=3.5.0",
+    "feedparser>=6.0.12",
     "slowapi>=0.1.9",
     "sqlalchemy>=2.0.46",
     "uvicorn[standard]>=0.41.0",
