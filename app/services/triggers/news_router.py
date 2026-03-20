@@ -3,6 +3,7 @@ import feedparser
 import urllib.parse
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
+from app.services.triggers.news_utils import strip_html, resolve_url
 
 router = APIRouter(prefix="/api/news", tags=["news"])
 
@@ -11,27 +12,31 @@ router = APIRouter(prefix="/api/news", tags=["news"])
 async def preview_news(q: str = Query(..., description="Search query"), lang: str = Query("en")):
     """
     Fetch real news articles from Google News RSS, sorted newest → oldest.
-    Used by the frontend to test the News Trigger configuration.
+    Resolves actual article URLs and strips HTML from snippets.
     """
     encoded_query = urllib.parse.quote_plus(q)
     rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl={lang}"
 
     feed = await asyncio.to_thread(feedparser.parse, rss_url)
 
+    # Resolve all redirect URLs concurrently
+    entries = feed.entries
+    redirect_urls = [getattr(e, "link", "") for e in entries]
+    real_urls = await asyncio.gather(*[resolve_url(u) for u in redirect_urls])
+
     articles = []
-    for entry in feed.entries:
+    for entry, real_url in zip(entries, real_urls):
         articles.append({
-            "title": getattr(entry, "title", "No title"),
-            "url": getattr(entry, "link", ""),
+            "title": strip_html(getattr(entry, "title", "No title")),
+            "url": real_url,
             "source": getattr(entry, "source", {}).get("title", "Google News") if hasattr(entry, "source") else "Google News",
             "published": getattr(entry, "published", ""),
-            "_ts": entry.get("published_parsed"),  # time.struct_time or None
+            "snippet": strip_html(getattr(entry, "summary", "")),
+            "_ts": entry.get("published_parsed"),
         })
 
-    # Sort newest first; articles with no date sink to the bottom
+    # Sort newest first
     articles.sort(key=lambda a: a["_ts"] or (0,) * 9, reverse=True)
-
-    # Strip the internal sort key before returning
     for a in articles:
         del a["_ts"]
 
