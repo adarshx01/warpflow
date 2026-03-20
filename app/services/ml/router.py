@@ -407,6 +407,7 @@ async def ml_upload_dataset(user_id: str, params: dict[str, Any], db: AsyncSessi
             content=file_content,
             extension=file_type,
             content_type="text/csv" if file_type == "csv" else "application/json",
+            filename=filename,
         )
 
         # Save metadata to database

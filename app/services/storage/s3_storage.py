@@ -49,9 +49,12 @@ def ensure_bucket_exists() -> None:
             raise
 
 
-def _build_s3_path(user_id: UUID, category: str, file_id: UUID, extension: str) -> str:
+def _build_s3_path(user_id: UUID, category: str, file_id: UUID, extension: str, filename: str = None) -> str:
     """Build the S3 object key path."""
-    return f"{category}/{user_id}/{file_id}.{extension}"
+    if filename:
+        # Use original filename with UUID prefix for uniqueness
+        return f"{category}/{file_id}_{filename}"
+    return f"{category}/{file_id}.{extension}"
 
 
 def upload_file(
@@ -61,6 +64,7 @@ def upload_file(
     content: bytes,
     extension: str,
     content_type: str = "application/octet-stream",
+    filename: str = None,
 ) -> str:
     """
     Upload a file to S3 storage.
@@ -72,13 +76,14 @@ def upload_file(
         content: File content as bytes
         extension: File extension (csv, json, pdf, etc.)
         content_type: MIME type of the file
+        filename: Original filename (optional)
 
     Returns:
         The S3 object key (path) for the uploaded file
     """
     settings = get_settings()
     client = _get_s3_client()
-    s3_path = _build_s3_path(user_id, category, file_id, extension)
+    s3_path = _build_s3_path(user_id, category, file_id, extension, filename)
 
     client.put_object(
         Bucket=settings.S3_BUCKET_NAME,
@@ -203,6 +208,7 @@ async def upload_file_for_user(
     content: bytes,
     extension: str,
     content_type: str = "application/octet-stream",
+    filename: str = None,
 ) -> str:
     """
     Upload a file to S3 using user's credentials if available.
@@ -215,13 +221,14 @@ async def upload_file_for_user(
         content: File content as bytes
         extension: File extension (csv, json, pdf, etc.)
         content_type: MIME type of the file
+        filename: Original filename (optional)
 
     Returns:
         The S3 object key (path) for the uploaded file
     """
     config, bucket = await get_user_s3_config(db, user_id)
     client = boto3.client("s3", **config)
-    s3_path = _build_s3_path(user_id, category, file_id, extension)
+    s3_path = _build_s3_path(user_id, category, file_id, extension, filename)
 
     client.put_object(
         Bucket=bucket,

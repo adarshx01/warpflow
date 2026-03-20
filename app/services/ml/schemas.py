@@ -29,10 +29,15 @@ class ColumnInfo(BaseModel):
     """Information about a single column."""
     name: str
     dtype: str
-    column_type: Literal["numeric", "categorical"]
-    null_count: int
-    null_percentage: float
-    unique_count: int
+    column_type: Literal["numeric", "categorical"] | None = None
+    null_count: int | None = None
+    null_percentage: float | None = None
+    unique_count: int | None = None
+    # Legacy fields for backward compatibility
+    non_null_count: int | None = None
+    min: float | None = None
+    max: float | None = None
+    # New structured fields
     stats: ColumnStats | None = None
     top_values: list[TopValue] | None = None
 

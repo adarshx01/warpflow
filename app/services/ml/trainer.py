@@ -54,24 +54,62 @@ def load_dataset(content: bytes, file_type: str) -> pd.DataFrame:
 
 
 def get_dataset_info(df: pd.DataFrame) -> dict:
-    """Extract metadata from a DataFrame (legacy function for compatibility)."""
+    """Extract metadata from a DataFrame matching DatasetResponse schema."""
+    row_count = len(df)
     columns = []
+
     for col in df.columns:
+        dtype_str = str(df[col].dtype)
+        null_count = int(df[col].isna().sum())
+        null_percentage = round((null_count / row_count) * 100, 2) if row_count > 0 else 0.0
+        unique_count = int(df[col].nunique())
+
+        # Determine column type
+        is_numeric = df[col].dtype in ["int64", "float64", "int32", "float32"]
+        column_type = "numeric" if is_numeric else "categorical"
+
         col_info = {
             "name": col,
-            "dtype": str(df[col].dtype),
-            "non_null_count": int(df[col].notna().sum()),
-            "unique_count": int(df[col].nunique()),
+            "dtype": dtype_str,
+            "column_type": column_type,
+            "null_count": null_count,
+            "null_percentage": null_percentage,
+            "unique_count": unique_count,
         }
-        if df[col].dtype in ["int64", "float64"]:
-            col_info["min"] = float(df[col].min()) if not pd.isna(df[col].min()) else None
-            col_info["max"] = float(df[col].max()) if not pd.isna(df[col].max()) else None
+
+        # Add stats for numeric columns
+        if is_numeric:
+            col_info["stats"] = {
+                "min": float(df[col].min()) if not pd.isna(df[col].min()) else None,
+                "max": float(df[col].max()) if not pd.isna(df[col].max()) else None,
+                "mean": float(df[col].mean()) if not pd.isna(df[col].mean()) else None,
+                "median": float(df[col].median()) if not pd.isna(df[col].median()) else None,
+                "std": float(df[col].std()) if not pd.isna(df[col].std()) else None,
+            }
+        else:
+            # Add top values for categorical columns
+            value_counts = df[col].value_counts().head(5)
+            col_info["top_values"] = [
+                {"value": str(val), "count": int(count)}
+                for val, count in value_counts.items()
+            ]
+
         columns.append(col_info)
 
+    # Build preview matching DatasetPreviewResponse schema
+    preview_df = df.head(5)
+    preview = {
+        "columns": list(df.columns),
+        "dtypes": {col: str(df[col].dtype) for col in df.columns},
+        "data": preview_df.to_dict(orient="records"),
+        "total_rows": row_count,
+        "preview_rows": len(preview_df),
+    }
+
     return {
-        "row_count": len(df),
+        "row_count": row_count,
         "columns": columns,
-        "preview": df.head(5).to_dict(orient="records"),
+        "preview": preview,
     }
 
 
