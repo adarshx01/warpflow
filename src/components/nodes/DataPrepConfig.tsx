@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, CheckCircle2, AlertCircle, Loader2, Upload, Eye, BarChart3, Database } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Loader2, Upload, Eye, BarChart3, Cloud, Key, RotateCcw, ShieldCheck } from 'lucide-react';
 import { api } from '../../lib/api';
+import { checkSecretExists, setSecret, deleteSecret, type SecretKey } from '../../lib/secrets';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,35 @@ const DataPrepConfig: React.FC<DataPrepConfigProps> = ({ initialData, onSave }) 
     // Upload state
     const [dragActive, setDragActive] = useState(false);
     const [uploadResult, setUploadResult] = useState<{ ok: boolean; data: unknown } | null>(null);
+
+    // S3/Storage configuration state
+    const [storageExpanded, setStorageExpanded] = useState(false);
+    const [s3Configured, setS3Configured] = useState(false);
+    const [s3Loading, setS3Loading] = useState(true);
+    const [s3Saving, setS3Saving] = useState(false);
+    const [s3Status, setS3Status] = useState<{ ok: boolean; message: string } | null>(null);
+    const [s3Form, setS3Form] = useState({
+        accessKey: '',
+        secretKey: '',
+        endpointUrl: '',
+        bucketName: '',
+        region: 'us-east-1',
+    });
+
+    // Check if S3 is configured on mount
+    useEffect(() => {
+        (async () => {
+            try {
+                const exists = await checkSecretExists('s3_access_key');
+                setS3Configured(exists);
+                if (!exists) {
+                    setStorageExpanded(true);
+                }
+            } finally {
+                setS3Loading(false);
+            }
+        })();
+    }, []);
 
     useEffect(() => {
         loadDatasets();
@@ -152,8 +182,181 @@ const DataPrepConfig: React.FC<DataPrepConfigProps> = ({ initialData, onSave }) 
         }
     };
 
+    const handleSaveS3Config = async () => {
+        if (!s3Form.accessKey.trim() || !s3Form.secretKey.trim()) {
+            setS3Status({ ok: false, message: 'Access Key and Secret Key are required' });
+            return;
+        }
+        setS3Saving(true);
+        setS3Status(null);
+        try {
+            const secrets: [SecretKey, string][] = [
+                ['s3_access_key', s3Form.accessKey.trim()],
+                ['s3_secret_key', s3Form.secretKey.trim()],
+                ['s3_endpoint_url', s3Form.endpointUrl.trim()],
+                ['s3_bucket_name', s3Form.bucketName.trim()],
+                ['s3_region', s3Form.region.trim()],
+            ];
+            await Promise.all(secrets.filter(([, v]) => v).map(([k, v]) => setSecret(k, v)));
+            setS3Configured(true);
+            setS3Form({ accessKey: '', secretKey: '', endpointUrl: '', bucketName: '', region: 'us-east-1' });
+            setS3Status({ ok: true, message: 'Storage credentials saved securely' });
+        } catch (err) {
+            setS3Status({ ok: false, message: err instanceof Error ? err.message : 'Failed to save credentials' });
+        } finally {
+            setS3Saving(false);
+        }
+    };
+
+    const handleResetS3Config = async () => {
+        setS3Saving(true);
+        setS3Status(null);
+        try {
+            const keys: SecretKey[] = ['s3_access_key', 's3_secret_key', 's3_endpoint_url', 's3_bucket_name', 's3_region'];
+            await Promise.all(keys.map(k => deleteSecret(k).catch(() => {})));
+            setS3Configured(false);
+            setS3Status({ ok: true, message: 'Storage credentials cleared. Enter new credentials below.' });
+        } catch (err) {
+            setS3Status({ ok: false, message: err instanceof Error ? err.message : 'Failed to reset credentials' });
+        } finally {
+            setS3Saving(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
+            {/* ── Storage Configuration Section ── */}
+            <section>
+                <button
+                    type="button"
+                    onClick={() => setStorageExpanded(!storageExpanded)}
+                    className="w-full flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"
+                >
+                    <span className="flex items-center gap-2">
+                        <div className="w-1 h-4 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full" />
+                        <Cloud className="w-4 h-4" />
+                        Storage Configuration
+                        {s3Configured && (
+                            <span className="ml-2 px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-xs rounded-full font-normal normal-case">
+                                Configured
+                            </span>
+                        )}
+                    </span>
+                    {storageExpanded ? (
+                        <ChevronDown className="w-4 h-4" />
+                    ) : (
+                        <ChevronRight className="w-4 h-4" />
+                    )}
+                </button>
+
+                {storageExpanded && (
+                    <div className="space-y-4">
+                        {s3Loading ? (
+                            <div className="flex items-center gap-2 text-slate-500 text-sm">
+                                <Loader2 className="w-4 h-4 animate-spin" /> Checking storage configuration...
+                            </div>
+                        ) : s3Configured ? (
+                            <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                                <div className="flex items-center gap-2 text-emerald-300 text-sm">
+                                    <ShieldCheck className="w-4 h-4" />
+                                    <span>S3/MinIO storage is configured</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleResetS3Config}
+                                    disabled={s3Saving}
+                                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
+                                >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                    Reset
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Field label="Access Key" hint="Required">
+                                        <div className="relative">
+                                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                            <input
+                                                type="password"
+                                                className={`${inputClass} pl-9`}
+                                                placeholder="S3 Access Key"
+                                                value={s3Form.accessKey}
+                                                onChange={(e) => setS3Form({ ...s3Form, accessKey: e.target.value })}
+                                                autoComplete="new-password"
+                                            />
+                                        </div>
+                                    </Field>
+                                    <Field label="Secret Key" hint="Required">
+                                        <div className="relative">
+                                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                            <input
+                                                type="password"
+                                                className={`${inputClass} pl-9`}
+                                                placeholder="S3 Secret Key"
+                                                value={s3Form.secretKey}
+                                                onChange={(e) => setS3Form({ ...s3Form, secretKey: e.target.value })}
+                                                autoComplete="new-password"
+                                            />
+                                        </div>
+                                    </Field>
+                                </div>
+                                <Field label="Endpoint URL" hint="For MinIO, e.g. http://localhost:9000">
+                                    <input
+                                        type="text"
+                                        className={inputClass}
+                                        placeholder="https://s3.amazonaws.com (leave empty for AWS S3)"
+                                        value={s3Form.endpointUrl}
+                                        onChange={(e) => setS3Form({ ...s3Form, endpointUrl: e.target.value })}
+                                    />
+                                </Field>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Field label="Bucket Name">
+                                        <input
+                                            type="text"
+                                            className={inputClass}
+                                            placeholder="my-bucket"
+                                            value={s3Form.bucketName}
+                                            onChange={(e) => setS3Form({ ...s3Form, bucketName: e.target.value })}
+                                        />
+                                    </Field>
+                                    <Field label="Region">
+                                        <input
+                                            type="text"
+                                            className={inputClass}
+                                            placeholder="us-east-1"
+                                            value={s3Form.region}
+                                            onChange={(e) => setS3Form({ ...s3Form, region: e.target.value })}
+                                        />
+                                    </Field>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveS3Config}
+                                    disabled={s3Saving || !s3Form.accessKey.trim() || !s3Form.secretKey.trim()}
+                                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                                >
+                                    {s3Saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+                                    Save Storage Credentials
+                                </button>
+                                <p className="text-xs text-slate-500">
+                                    Credentials are encrypted and stored securely. They will never be sent back to your browser.
+                                </p>
+                            </div>
+                        )}
+
+                        {s3Status && (
+                            <div className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${s3Status.ok ? 'bg-green-500/10 border-green-500/30 text-green-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                                {s3Status.ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                                {s3Status.message}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </section>
+
+            <div className="h-px bg-slate-700/50" />
+
             {/* ── Upload Section ── */}
             <section>
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
