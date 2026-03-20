@@ -25,6 +25,10 @@ const providerSecretKey = (provider: Provider): SecretKey =>
 const AIAgentConfig: React.FC<AIAgentConfigProps> = ({ initialData, onSave }) => {
   const [provider, setProvider] = useState<Provider>((initialData.aiProvider as Provider) ?? 'gemini');
   const [model, setModel] = useState((initialData.aiModel as string) ?? '');
+  const [promptTemplate, setPromptTemplate] = useState(
+    (initialData.promptTemplate as string) ??
+    'A new news article was published: "{title}"\nURL: {url}\nSnippet: {snippet}\n\nSummarize this in 2-3 sentences and post the summary to the configured Slack channel.'
+  );
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -110,7 +114,7 @@ const AIAgentConfig: React.FC<AIAgentConfigProps> = ({ initialData, onSave }) =>
     setSaving(true);
     setStatus(null);
     try {
-      onSave({ aiProvider: provider, aiModel: model });
+      onSave({ aiProvider: provider, aiModel: model, promptTemplate });
       setStatus({ ok: true, message: 'Agent configuration saved.' });
     } catch (err) {
       setStatus({ ok: false, message: err instanceof Error ? err.message : 'Failed to save configuration' });
@@ -214,6 +218,18 @@ const AIAgentConfig: React.FC<AIAgentConfigProps> = ({ initialData, onSave }) =>
             </p>
           </div>
         )}
+      </section>
+
+      {/* Prompt Template */}
+      <section className="space-y-3">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Trigger Prompt Template</h3>
+        <p className="text-xs text-slate-500">Used when this agent is triggered automatically (e.g. by a News Trigger). Supports: <code className="text-purple-400">{'{{title}}'}</code>, <code className="text-purple-400">{'{{url}}'}</code>, <code className="text-purple-400">{'{{snippet}}'}</code>, <code className="text-purple-400">{'{{subject}}'}</code>, <code className="text-purple-400">{'{{body}}'}</code></p>
+        <textarea
+          className="w-full h-32 px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 focus:border-fuchsia-500/50 transition-all resize-y font-mono"
+          value={promptTemplate}
+          onChange={(e) => setPromptTemplate(e.target.value)}
+          placeholder="Describe what the agent should do when triggered..."
+        />
       </section>
 
       {/* Status */}

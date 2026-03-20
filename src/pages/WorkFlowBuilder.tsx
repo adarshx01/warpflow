@@ -35,6 +35,7 @@ const nodeTypes: NodeType[] = [
   { id: 'schedule', name: 'Schedule', icon: '⏰', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Triggers' },
   { id: 'webhook', name: 'Webhook', icon: '🔗', color: 'from-cyan-400 via-teal-400 to-green-500', category: 'Triggers' },
   { id: 'email-trigger', name: 'Email Trigger', icon: '📨', color: 'from-pink-400 via-rose-400 to-red-500', category: 'Triggers' },
+  { id: 'news-trigger', name: 'News Trigger', icon: '📰', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Triggers' },
 
   // AI & ML
   { id: 'openai', name: 'OpenAI (ChatGPT)', icon: '🧠', color: 'from-emerald-400 via-teal-400 to-cyan-500', category: 'AI & ML' },
