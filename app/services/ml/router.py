@@ -12,7 +12,11 @@ from app.database import get_db
 from app.models import User, MLDataset, MLModel
 from app.auth.utils import get_current_user
 from app.services.storage import upload_file, download_file, delete_file
-from app.services.storage.s3_storage import decode_base64_content
+from app.services.storage.s3_storage import (
+    decode_base64_content,
+    upload_file_for_user,
+    download_file_for_user,
+)
 from app.services.ml.schemas import (
     UploadDatasetRequest,
     TrainModelRequest,
@@ -393,9 +397,10 @@ async def ml_upload_dataset(user_id: str, params: dict[str, Any], db: AsyncSessi
         # Also perform analysis
         analysis = analyze_dataset(df)
 
-        # Upload to S3
+        # Upload to S3 using user's credentials if available
         dataset_id = uuid4()
-        s3_path = upload_file(
+        s3_path = await upload_file_for_user(
+            db=db,
             user_id=UUID(user_id),
             category="datasets",
             file_id=dataset_id,
@@ -441,7 +446,7 @@ async def ml_analyze_dataset(user_id: str, params: dict[str, Any], db: AsyncSess
 
         # Load dataset
         dataset = await _get_dataset_model(db, dataset_id, UUID(user_id))
-        content = download_file(dataset.s3_path)
+        content = await download_file_for_user(db, UUID(user_id), dataset.s3_path)
         df = load_dataset(content, dataset.file_type)
 
         # Analyze
@@ -461,7 +466,7 @@ async def ml_preview_dataset(user_id: str, params: dict[str, Any], db: AsyncSess
 
         # Load dataset
         dataset = await _get_dataset_model(db, dataset_id, UUID(user_id))
-        content = download_file(dataset.s3_path)
+        content = await download_file_for_user(db, UUID(user_id), dataset.s3_path)
         df = load_dataset(content, dataset.file_type)
 
         # Preview
@@ -493,7 +498,7 @@ async def ml_train_supervised(user_id: str, params: dict[str, Any], db: AsyncSes
 
         # Load dataset
         dataset = await _get_dataset_model(db, dataset_id, UUID(user_id))
-        content = download_file(dataset.s3_path)
+        content = await download_file_for_user(db, UUID(user_id), dataset.s3_path)
         df = load_dataset(content, dataset.file_type)
 
         # Train model
@@ -518,7 +523,8 @@ async def ml_train_supervised(user_id: str, params: dict[str, Any], db: AsyncSes
         # Serialize and upload model
         model_id = uuid4()
         model_bytes = serialize_model(model, scaler)
-        s3_path = upload_file(
+        s3_path = await upload_file_for_user(
+            db=db,
             user_id=UUID(user_id),
             category="models",
             file_id=model_id,
@@ -578,7 +584,7 @@ async def ml_train_unsupervised(user_id: str, params: dict[str, Any], db: AsyncS
 
         # Load dataset
         dataset = await _get_dataset_model(db, dataset_id, UUID(user_id))
-        content = download_file(dataset.s3_path)
+        content = await download_file_for_user(db, UUID(user_id), dataset.s3_path)
         df = load_dataset(content, dataset.file_type)
 
         # Train model
@@ -599,7 +605,8 @@ async def ml_train_unsupervised(user_id: str, params: dict[str, Any], db: AsyncS
         # Serialize and upload model
         model_id = uuid4()
         model_bytes = serialize_model(model, scaler)
-        s3_path = upload_file(
+        s3_path = await upload_file_for_user(
+            db=db,
             user_id=UUID(user_id),
             category="models",
             file_id=model_id,
@@ -660,7 +667,7 @@ async def ml_train_model(user_id: str, params: dict[str, Any], db: AsyncSession 
 
         # Load dataset
         dataset = await _get_dataset_model(db, dataset_id, UUID(user_id))
-        content = download_file(dataset.s3_path)
+        content = await download_file_for_user(db, UUID(user_id), dataset.s3_path)
         df = load_dataset(content, dataset.file_type)
 
         # Train model
@@ -677,7 +684,8 @@ async def ml_train_model(user_id: str, params: dict[str, Any], db: AsyncSession 
         # Serialize and upload model
         model_id = uuid4()
         model_bytes = serialize_model(model)
-        s3_path = upload_file(
+        s3_path = await upload_file_for_user(
+            db=db,
             user_id=UUID(user_id),
             category="models",
             file_id=model_id,
@@ -730,7 +738,7 @@ async def ml_predict(user_id: str, params: dict[str, Any], db: AsyncSession = No
 
         # Load model metadata and file
         ml_model = await _get_model_model(db, model_id, UUID(user_id))
-        model_bytes = download_file(ml_model.s3_path)
+        model_bytes = await download_file_for_user(db, UUID(user_id), ml_model.s3_path)
         model, scaler = deserialize_model(model_bytes)
 
         # Run prediction
