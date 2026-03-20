@@ -65,6 +65,11 @@ export async function api<T = unknown>(
     throw new Error(error.detail || `HTTP ${res.status}`);
   }
 
+  // Handle 204 No Content responses (no body to parse)
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   return res.json();
 }
 
