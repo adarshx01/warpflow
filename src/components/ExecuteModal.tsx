@@ -85,7 +85,14 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
     // Check if there's an AI agent node
     const hasAgentNode = Boolean(agentNode);
     const serviceNodes = nodes.filter(n =>
-        ['google-docs', 'google-drive', 'gmail', 'google-sheets', 'google-forms'].includes(n.type)
+        [
+            // Google Workspace
+            'google-docs', 'google-drive', 'gmail', 'google-sheets', 'google-forms',
+            // ML Services
+            'data-prep', 'supervised-train', 'unsupervised-train', 'model-inference',
+            // Other
+            'context-store',
+        ].includes(n.type)
     );
 
     const handleExecute = async () => {
@@ -153,7 +160,7 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
                             <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
                             <div>
                                 <p className="text-sm font-medium text-amber-300">No service nodes connected</p>
-                                <p className="text-xs text-amber-400/80 mt-1">Connect Google Docs, Gmail, Drive, Sheets, or Forms nodes to the AI Agent.</p>
+                                <p className="text-xs text-amber-400/80 mt-1">Connect service nodes to the AI Agent: Google Workspace (Docs, Gmail, Drive, Sheets, Forms) or ML nodes (Data Prep, Training, Inference).</p>
                             </div>
                         </div>
                     )}
