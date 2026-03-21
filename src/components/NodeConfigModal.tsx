@@ -14,6 +14,7 @@ import WebhookConfig from './nodes/WebhookConfig';
 import EmailTriggerConfig from './nodes/EmailTriggerConfig';
 import NewsTriggerConfig from './nodes/NewsTriggerConfig';
 import SlackConfig from './nodes/SlackConfig';
+import TelegramConfig from './nodes/TelegramConfig';
 
 interface Node {
     id: string;
@@ -65,6 +66,8 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <NewsTriggerConfig initialData={node.data} onSave={handleSave} />;
             case 'slack':
                 return <SlackConfig initialData={node.data} onSave={handleSave} />;
+            case 'telegram':
+                return <TelegramConfig initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
