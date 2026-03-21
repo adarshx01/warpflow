@@ -35,6 +35,21 @@ from app.services.slack.service import (
     slack_pin_message, slack_unpin_message, slack_list_pins,
     slack_search_messages, slack_get_workspace_info, slack_get_bot_info, slack_add_reminder,
 )
+from app.services.telegram.service import (
+    telegram_get_me, telegram_get_my_commands, telegram_set_my_commands,
+    telegram_send_message, telegram_edit_message, telegram_delete_message,
+    telegram_forward_message, telegram_copy_message, telegram_pin_message,
+    telegram_unpin_message, telegram_unpin_all_messages,
+    telegram_send_photo, telegram_send_document, telegram_send_audio,
+    telegram_send_video, telegram_send_animation, telegram_send_sticker,
+    telegram_send_location, telegram_send_poll,
+    telegram_get_chat, telegram_get_chat_member_count, telegram_get_chat_member,
+    telegram_ban_chat_member, telegram_unban_chat_member, telegram_restrict_chat_member,
+    telegram_promote_chat_member, telegram_set_chat_title, telegram_set_chat_description,
+    telegram_leave_chat, telegram_export_invite_link,
+    telegram_get_file, telegram_answer_callback_query,
+    telegram_set_webhook, telegram_delete_webhook, telegram_get_webhook_info,
+)
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
@@ -702,6 +717,292 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "user": {"type": "string", "description": "User ID to remind (defaults to bot user)"},
             }, "required": ["text", "time"]},
             "_fn": slack_add_reminder,
+        },
+    ],
+    "telegram": [
+        {
+            "name": "telegram_send_message",
+            "description": "Send a text message to a Telegram chat, group, or channel. Supports HTML formatting.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Target chat ID or @username"},
+                "text": {"type": "string", "description": "Message text (HTML supported)"},
+                "parse_mode": {"type": "string", "description": "Formatting: HTML or Markdown"},
+                "reply_to_message_id": {"type": "integer", "description": "Reply to a specific message ID"},
+                "disable_web_page_preview": {"type": "boolean", "description": "Disable link preview"},
+                "disable_notification": {"type": "boolean", "description": "Send silently"},
+            }, "required": ["chat_id", "text"]},
+            "_fn": telegram_send_message,
+        },
+        {
+            "name": "telegram_edit_message",
+            "description": "Edit the text of an existing Telegram message.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to edit"},
+                "text": {"type": "string", "description": "New message text"},
+                "parse_mode": {"type": "string", "description": "Formatting: HTML or Markdown"},
+            }, "required": ["chat_id", "message_id", "text"]},
+            "_fn": telegram_edit_message,
+        },
+        {
+            "name": "telegram_delete_message",
+            "description": "Delete a message from a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to delete"},
+            }, "required": ["chat_id", "message_id"]},
+            "_fn": telegram_delete_message,
+        },
+        {
+            "name": "telegram_forward_message",
+            "description": "Forward a message from one Telegram chat to another.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Destination chat ID"},
+                "from_chat_id": {"type": "string", "description": "Source chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to forward"},
+            }, "required": ["chat_id", "from_chat_id", "message_id"]},
+            "_fn": telegram_forward_message,
+        },
+        {
+            "name": "telegram_copy_message",
+            "description": "Copy a message to another chat without the forward tag.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Destination chat ID"},
+                "from_chat_id": {"type": "string", "description": "Source chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to copy"},
+                "caption": {"type": "string", "description": "Optional caption"},
+            }, "required": ["chat_id", "from_chat_id", "message_id"]},
+            "_fn": telegram_copy_message,
+        },
+        {
+            "name": "telegram_pin_message",
+            "description": "Pin a message in a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to pin"},
+                "disable_notification": {"type": "boolean", "description": "Pin silently"},
+            }, "required": ["chat_id", "message_id"]},
+            "_fn": telegram_pin_message,
+        },
+        {
+            "name": "telegram_unpin_message",
+            "description": "Unpin a specific message in a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to unpin (omit to unpin latest)"},
+            }, "required": ["chat_id"]},
+            "_fn": telegram_unpin_message,
+        },
+        {
+            "name": "telegram_unpin_all_messages",
+            "description": "Unpin all pinned messages in a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+            }, "required": ["chat_id"]},
+            "_fn": telegram_unpin_all_messages,
+        },
+        {
+            "name": "telegram_send_photo",
+            "description": "Send a photo to a Telegram chat using a file_id or public URL.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "photo": {"type": "string", "description": "File ID or public URL of the photo"},
+                "caption": {"type": "string", "description": "Optional caption"},
+                "parse_mode": {"type": "string", "description": "Formatting: HTML or Markdown"},
+            }, "required": ["chat_id", "photo"]},
+            "_fn": telegram_send_photo,
+        },
+        {
+            "name": "telegram_send_document",
+            "description": "Send a document or file to a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "document": {"type": "string", "description": "File ID or public URL"},
+                "caption": {"type": "string", "description": "Optional caption"},
+            }, "required": ["chat_id", "document"]},
+            "_fn": telegram_send_document,
+        },
+        {
+            "name": "telegram_send_audio",
+            "description": "Send an audio file to a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "audio": {"type": "string", "description": "File ID or public URL"},
+                "caption": {"type": "string", "description": "Optional caption"},
+                "title": {"type": "string", "description": "Audio title"},
+                "performer": {"type": "string", "description": "Audio performer"},
+            }, "required": ["chat_id", "audio"]},
+            "_fn": telegram_send_audio,
+        },
+        {
+            "name": "telegram_send_video",
+            "description": "Send a video to a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "video": {"type": "string", "description": "File ID or public URL"},
+                "caption": {"type": "string", "description": "Optional caption"},
+            }, "required": ["chat_id", "video"]},
+            "_fn": telegram_send_video,
+        },
+        {
+            "name": "telegram_send_animation",
+            "description": "Send a GIF or animation to a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "animation": {"type": "string", "description": "File ID or public URL"},
+                "caption": {"type": "string", "description": "Optional caption"},
+            }, "required": ["chat_id", "animation"]},
+            "_fn": telegram_send_animation,
+        },
+        {
+            "name": "telegram_send_sticker",
+            "description": "Send a sticker to a Telegram chat using its file_id.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "sticker": {"type": "string", "description": "Sticker file ID"},
+            }, "required": ["chat_id", "sticker"]},
+            "_fn": telegram_send_sticker,
+        },
+        {
+            "name": "telegram_send_location",
+            "description": "Send a geographical location to a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "latitude": {"type": "number", "description": "Latitude"},
+                "longitude": {"type": "number", "description": "Longitude"},
+                "live_period": {"type": "integer", "description": "Seconds for live location (60-86400)"},
+            }, "required": ["chat_id", "latitude", "longitude"]},
+            "_fn": telegram_send_location,
+        },
+        {
+            "name": "telegram_send_poll",
+            "description": "Send a poll to a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "question": {"type": "string", "description": "Poll question"},
+                "options": {"type": "array", "items": {"type": "string"}, "description": "List of answer options (2-10)"},
+                "is_anonymous": {"type": "boolean", "description": "Whether the poll is anonymous"},
+                "type": {"type": "string", "description": "Poll type: regular or quiz"},
+                "allows_multiple_answers": {"type": "boolean", "description": "Allow multiple answers"},
+            }, "required": ["chat_id", "question", "options"]},
+            "_fn": telegram_send_poll,
+        },
+        {
+            "name": "telegram_get_chat",
+            "description": "Get information about a Telegram chat (group, channel, or user).",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID or @username"},
+            }, "required": ["chat_id"]},
+            "_fn": telegram_get_chat,
+        },
+        {
+            "name": "telegram_get_chat_member_count",
+            "description": "Get the number of members in a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+            }, "required": ["chat_id"]},
+            "_fn": telegram_get_chat_member_count,
+        },
+        {
+            "name": "telegram_get_chat_member",
+            "description": "Get information about a specific member in a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "user_id": {"type": "integer", "description": "Telegram user ID"},
+            }, "required": ["chat_id", "user_id"]},
+            "_fn": telegram_get_chat_member,
+        },
+        {
+            "name": "telegram_ban_chat_member",
+            "description": "Ban a user from a Telegram group or channel.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "user_id": {"type": "integer", "description": "User ID to ban"},
+                "until_date": {"type": "integer", "description": "Unix timestamp when ban is lifted (0 = permanent)"},
+                "revoke_messages": {"type": "boolean", "description": "Delete all messages from this user"},
+            }, "required": ["chat_id", "user_id"]},
+            "_fn": telegram_ban_chat_member,
+        },
+        {
+            "name": "telegram_unban_chat_member",
+            "description": "Unban a previously banned user from a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "user_id": {"type": "integer", "description": "User ID to unban"},
+            }, "required": ["chat_id", "user_id"]},
+            "_fn": telegram_unban_chat_member,
+        },
+        {
+            "name": "telegram_set_chat_title",
+            "description": "Change the title of a Telegram group or channel.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "title": {"type": "string", "description": "New chat title"},
+            }, "required": ["chat_id", "title"]},
+            "_fn": telegram_set_chat_title,
+        },
+        {
+            "name": "telegram_set_chat_description",
+            "description": "Change the description of a Telegram group or channel.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "description": {"type": "string", "description": "New description (empty string to remove)"},
+            }, "required": ["chat_id"]},
+            "_fn": telegram_set_chat_description,
+        },
+        {
+            "name": "telegram_leave_chat",
+            "description": "Make the Telegram bot leave a group, supergroup, or channel.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID to leave"},
+            }, "required": ["chat_id"]},
+            "_fn": telegram_leave_chat,
+        },
+        {
+            "name": "telegram_export_invite_link",
+            "description": "Generate a new primary invite link for a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+            }, "required": ["chat_id"]},
+            "_fn": telegram_export_invite_link,
+        },
+        {
+            "name": "telegram_get_me",
+            "description": "Get basic information about the Telegram bot.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+            "_fn": telegram_get_me,
+        },
+        {
+            "name": "telegram_get_file",
+            "description": "Get file info and a direct download URL for a Telegram file by its file_id.",
+            "parameters": {"type": "object", "properties": {
+                "file_id": {"type": "string", "description": "File ID from a received message"},
+            }, "required": ["file_id"]},
+            "_fn": telegram_get_file,
+        },
+        {
+            "name": "telegram_set_webhook",
+            "description": "Set a webhook URL so Telegram sends updates to your server.",
+            "parameters": {"type": "object", "properties": {
+                "url": {"type": "string", "description": "HTTPS URL to receive updates"},
+                "max_connections": {"type": "integer", "description": "Max simultaneous connections (1-100)"},
+                "drop_pending_updates": {"type": "boolean", "description": "Drop pending updates on set"},
+            }, "required": ["url"]},
+            "_fn": telegram_set_webhook,
+        },
+        {
+            "name": "telegram_delete_webhook",
+            "description": "Remove the webhook and switch back to manual polling.",
+            "parameters": {"type": "object", "properties": {
+                "drop_pending_updates": {"type": "boolean", "description": "Drop pending updates on removal"},
+            }, "required": []},
+            "_fn": telegram_delete_webhook,
+        },
+        {
+            "name": "telegram_get_webhook_info",
+            "description": "Get current Telegram webhook configuration and status.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+            "_fn": telegram_get_webhook_info,
         },
     ],
 }
