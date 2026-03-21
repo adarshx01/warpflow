@@ -29,14 +29,14 @@ SYSTEM_PROMPT = """You are an AI workflow automation agent. Execute the user's r
 IMPORTANT WORKFLOW GUIDELINES:
 
 For ML/Data tasks:
-1. ALWAYS call ml_list_datasets FIRST to get correct dataset UUIDs and column names
-2. THEN call ml_analyze_dataset to see sample_rows, column_dtypes, and statistics - this helps you understand the data
+1. CHECK NODE CONFIGURATIONS FIRST - If configurations are provided below, use those values directly (dataset_id, algorithm, hyperparameters, etc.)
+2. Only call ml_list_datasets if no dataset_id is configured
 3. Dataset IDs are UUIDs (like "653aba52-91ed-49b9-85b6-6e6a93ee56ae"), NOT filenames
-4. Column names are CASE-SENSITIVE (e.g., "Outcome" not "outcome") - use exact names from all_column_names
-5. If you need to know hyperparameters, call ml_list_algorithms
-6. For predictions, call ml_list_models first to get model UUID and feature_names
+4. Column names are CASE-SENSITIVE (e.g., "Outcome" not "outcome")
+5. For predictions, call ml_list_models first to get model UUID and feature_names
 
 For all tasks:
+- Use pre-configured values from node configurations when available
 - Think step by step about what actions are needed
 - Call tools in the correct sequence, using outputs from previous calls
 - After completing all actions, provide a clear summary including IDs, metrics, and results
@@ -62,6 +62,76 @@ class WorkflowEngine:
         self._workflow_id = workflow_id
         self._tool_map: dict[str, tuple[Any, str]] = {}
         self._steps: list[dict] = []
+        self._node_configs: dict[str, dict[str, Any]] = {}
+
+    def _extract_node_configs(self, service_nodes: list[dict]) -> str:
+        """Extract configurations from service nodes and return formatted context."""
+        configs = []
+
+        for node in service_nodes:
+            node_type = node.get("type", "")
+            node_data = node.get("data", {})
+
+            # Skip if no relevant config data
+            if not node_data:
+                continue
+
+            config_info = {"node_type": node_type}
+
+            # Extract ML-related configurations
+            if node_type in ("unsupervised-train", "supervised-train", "data-prep", "model-inference"):
+                # Dataset configuration
+                if node_data.get("dataset_id"):
+                    config_info["dataset_id"] = node_data["dataset_id"]
+
+                # Algorithm configuration
+                if node_data.get("algorithm"):
+                    config_info["algorithm"] = node_data["algorithm"]
+
+                # Target column (for supervised)
+                if node_data.get("target_column"):
+                    config_info["target_column"] = node_data["target_column"]
+
+                # Feature columns
+                if node_data.get("feature_columns"):
+                    config_info["feature_columns"] = node_data["feature_columns"]
+
+                # Model name
+                if node_data.get("model_name"):
+                    config_info["model_name"] = node_data["model_name"]
+
+                # Hyperparameters
+                if node_data.get("hyperparameters"):
+                    config_info["hyperparameters"] = node_data["hyperparameters"]
+
+                # Preprocessing
+                if node_data.get("preprocessing"):
+                    config_info["preprocessing"] = node_data["preprocessing"]
+
+                # Task type (clustering, dimensionality_reduction, etc.)
+                if node_data.get("task_type"):
+                    config_info["task_type"] = node_data["task_type"]
+
+                # Model ID (for inference)
+                if node_data.get("model_id"):
+                    config_info["model_id"] = node_data["model_id"]
+
+            # Only add if we have actual config values beyond just node_type
+            if len(config_info) > 1:
+                self._node_configs[node_type] = config_info
+                configs.append(config_info)
+
+        if not configs:
+            return ""
+
+        config_text = "\n\nNODE CONFIGURATIONS (use these values directly):\n"
+        for cfg in configs:
+            config_text += f"\n{cfg['node_type'].upper()} Node:\n"
+            for key, value in cfg.items():
+                if key != "node_type":
+                    config_text += f"  - {key}: {json.dumps(value) if isinstance(value, (dict, list)) else value}\n"
+
+        return config_text
 
     async def execute(
         self,
@@ -102,6 +172,9 @@ class WorkflowEngine:
                 detail="No service nodes connected to the AI Agent",
             )
 
+        # Extract node configurations before registering tools
+        node_config_context = self._extract_node_configs(service_nodes)
+
         # Register tools from connected service nodes
         await self._register_tools(service_nodes)
 
@@ -112,14 +185,19 @@ class WorkflowEngine:
                        "Ensure the service nodes have valid credentials configured.",
             )
 
+        # Enhance prompt with node configurations
+        enhanced_prompt = prompt
+        if node_config_context:
+            enhanced_prompt = f"{prompt}{node_config_context}"
+
         # Run the agent loop
         if ai_provider == "openai":
             summary = await self._run_openai_agent(
-                prompt, ai_api_key, ai_model or "gpt-4o",
+                enhanced_prompt, ai_api_key, ai_model or "gpt-4o",
             )
         else:
             summary = await self._run_gemini_agent(
-                prompt, ai_api_key, ai_model or "gemini-2.5-flash",
+                enhanced_prompt, ai_api_key, ai_model or "gemini-2.5-flash",
             )
 
         return {

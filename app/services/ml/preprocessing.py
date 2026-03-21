@@ -192,6 +192,34 @@ def create_train_test_val_split(
     Returns:
         Dict with X_train, X_val, X_test, and optionally y_train, y_val, y_test
     """
+    # Handle edge case: use all data for training (unsupervised learning)
+    if test_size == 0 and val_size == 0:
+        if y is not None:
+            return {
+                "X_train": X,
+                "X_val": np.array([]).reshape(0, X.shape[1]) if len(X.shape) > 1 else np.array([]),
+                "X_test": np.array([]).reshape(0, X.shape[1]) if len(X.shape) > 1 else np.array([]),
+                "y_train": y,
+                "y_val": np.array([]),
+                "y_test": np.array([]),
+                "split_info": {
+                    "train_samples": len(X),
+                    "val_samples": 0,
+                    "test_samples": 0,
+                },
+            }
+        else:
+            return {
+                "X_train": X,
+                "X_val": np.array([]).reshape(0, X.shape[1]) if len(X.shape) > 1 else np.array([]),
+                "X_test": np.array([]).reshape(0, X.shape[1]) if len(X.shape) > 1 else np.array([]),
+                "split_info": {
+                    "train_samples": len(X),
+                    "val_samples": 0,
+                    "test_samples": 0,
+                },
+            }
+
     # Normalize proportions
     total = train_size + val_size + test_size
     train_size = train_size / total
