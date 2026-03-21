@@ -30,6 +30,7 @@ from app.services.ml.router import (
     ml_get_model_info, ml_list_models, ml_list_datasets,
     ml_analyze_dataset, ml_preview_dataset,
     ml_train_supervised, ml_train_unsupervised,
+    ml_list_algorithms,
 )
 from app.services.context.router import (
     context_upload_document, context_query, context_list_documents,
@@ -557,7 +558,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_list_datasets",
-            "description": "List all uploaded datasets",
+            "description": "List all uploaded datasets. Returns dataset IDs, names, and column info. ALWAYS call this first to find the correct dataset_id (UUID) before training - never use the filename as dataset_id.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -584,11 +585,11 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_analyze_dataset",
-            "description": "Analyze a dataset to get column types (numeric/categorical), statistics, and missing value info. Always run this after uploading to understand your data.",
+            "description": "Analyze a dataset to understand its structure. Returns: (1) all_column_names - exact column names (case-sensitive), (2) sample_rows - first 5 rows of actual data, (3) column_dtypes - data types, (4) statistics per column. ALWAYS call this before training to see the data and use correct column names!",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "dataset_id": {"type": "string", "description": "ID of the dataset to analyze"},
+                    "dataset_id": {"type": "string", "description": "UUID of the dataset (get from ml_list_datasets)"},
                 },
                 "required": ["dataset_id"],
             },
@@ -596,11 +597,11 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_preview_dataset",
-            "description": "Get a preview of the dataset rows",
+            "description": "Preview first N rows of a dataset. Shows actual data values and exact column names (case-sensitive).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "dataset_id": {"type": "string", "description": "ID of the dataset"},
+                    "dataset_id": {"type": "string", "description": "UUID of the dataset (get from ml_list_datasets)"},
                     "n_rows": {"type": "integer", "description": "Number of rows to preview (default 10)"},
                 },
                 "required": ["dataset_id"],
@@ -609,7 +610,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_list_datasets",
-            "description": "List all uploaded datasets",
+            "description": "List all uploaded datasets. Returns dataset IDs (UUIDs), filenames, row counts, and column names. ALWAYS call this first to find the correct dataset_id before any other dataset operation.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -620,12 +621,22 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
     ],
     "supervised-train": [
         {
+            "name": "ml_list_algorithms",
+            "description": "List all available ML algorithms with their hyperparameters (iterations, learning_rate, n_estimators, max_depth, etc.). Call this to see what parameters each algorithm accepts.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": ml_list_algorithms,
+        },
+        {
             "name": "ml_train_supervised",
-            "description": "Train a supervised learning model (classification or regression). Supports algorithms: logistic_regression, random_forest_classifier, svm_classifier, gradient_boosting_classifier, adaboost_classifier, catboost_classifier for classification; linear_regression, random_forest_regressor, svm_regressor, gradient_boosting_regressor, adaboost_regressor, catboost_regressor for regression.",
+            "description": "Train a supervised ML model. IMPORTANT: (1) Call ml_list_datasets to get dataset UUID. (2) Call ml_analyze_dataset to see exact column names (case-sensitive). (3) Optionally call ml_list_algorithms to see hyperparameter options. Key hyperparams: iterations/max_iter (epochs), learning_rate, n_estimators, max_depth.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "dataset_id": {"type": "string", "description": "ID of the dataset to train on"},
+                    "dataset_id": {"type": "string", "description": "UUID of the dataset (from ml_list_datasets, NOT the filename)"},
                     "algorithm": {
                         "type": "string",
                         "enum": [
@@ -636,7 +647,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                         ],
                         "description": "ML algorithm to use",
                     },
-                    "target_column": {"type": "string", "description": "Target column for prediction (required)"},
+                    "target_column": {"type": "string", "description": "Target column name EXACTLY as shown in the dataset (case-sensitive)"},
                     "feature_columns": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -662,6 +673,10 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                             "test_size": {"type": "number", "description": "Test set proportion (default: 0.15)"},
                         },
                     },
+                    "hyperparameters": {
+                        "type": "object",
+                        "description": "Algorithm-specific params. Examples: catboost={iterations:200, learning_rate:0.05, depth:6}, random_forest={n_estimators:200, max_depth:15}, logistic={max_iter:2000, C:0.5}, gradient_boost={n_estimators:150, learning_rate:0.1, max_depth:5}",
+                    },
                 },
                 "required": ["dataset_id", "algorithm", "target_column"],
             },
@@ -669,7 +684,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_list_models",
-            "description": "List all trained models",
+            "description": "List all trained models with IDs, algorithms, metrics, and feature_names.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -679,11 +694,11 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_get_model_info",
-            "description": "Get information and metrics about a trained model",
+            "description": "Get detailed info about a trained model including metrics and hyperparameters used.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "model_id": {"type": "string", "description": "ID of the model"},
+                    "model_id": {"type": "string", "description": "UUID of the model"},
                 },
                 "required": ["model_id"],
             },
@@ -692,16 +707,26 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
     ],
     "unsupervised-train": [
         {
+            "name": "ml_list_algorithms",
+            "description": "List all available ML algorithms with their hyperparameters. Call to see clustering options like kmeans (n_clusters, max_iter) or dbscan (eps, min_samples).",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": ml_list_algorithms,
+        },
+        {
             "name": "ml_train_unsupervised",
-            "description": "Train an unsupervised learning model (clustering or dimensionality reduction). Supports algorithms: kmeans, dbscan for clustering; pca for dimensionality reduction.",
+            "description": "Train an unsupervised ML model. IMPORTANT: (1) First call ml_list_datasets to get the dataset UUID. (2) For kmeans, specify n_clusters in hyperparameters. Algorithms: kmeans (clustering), dbscan (density clustering), pca (dimensionality reduction).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "dataset_id": {"type": "string", "description": "ID of the dataset to train on"},
+                    "dataset_id": {"type": "string", "description": "UUID of the dataset (from ml_list_datasets, NOT the filename)"},
                     "algorithm": {
                         "type": "string",
                         "enum": ["kmeans", "dbscan", "pca"],
-                        "description": "ML algorithm to use",
+                        "description": "ML algorithm: kmeans (clustering), dbscan (density clustering), pca (dimensionality reduction)",
                     },
                     "feature_columns": {
                         "type": "array",
@@ -727,7 +752,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                     },
                     "hyperparameters": {
                         "type": "object",
-                        "description": "Algorithm-specific hyperparameters (e.g., n_clusters for kmeans)",
+                        "description": "Algorithm params: kmeans needs {n_clusters: 3}, dbscan needs {eps: 0.5, min_samples: 5}, pca needs {n_components: 2}",
                     },
                 },
                 "required": ["dataset_id", "algorithm"],
@@ -736,7 +761,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_list_models",
-            "description": "List all trained models",
+            "description": "List all trained models with their IDs, algorithms, and metrics.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -746,11 +771,11 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_get_model_info",
-            "description": "Get information and metrics about a trained model",
+            "description": "Get detailed info about a specific model including metrics and feature_names.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "model_id": {"type": "string", "description": "ID of the model"},
+                    "model_id": {"type": "string", "description": "UUID of the model"},
                 },
                 "required": ["model_id"],
             },
@@ -760,15 +785,15 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
     "model-inference": [
         {
             "name": "ml_predict",
-            "description": "Run predictions using a trained model",
+            "description": "Run predictions using a trained model. IMPORTANT: (1) First call ml_list_models to get available model IDs and their feature_names. (2) Provide input_data as array of objects where each object has keys matching the model's feature_names exactly. Returns predictions (class labels or values) and probabilities for classifiers.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "model_id": {"type": "string", "description": "ID of the trained model"},
+                    "model_id": {"type": "string", "description": "UUID of the trained model (from ml_list_models)"},
                     "input_data": {
                         "type": "array",
                         "items": {"type": "object"},
-                        "description": "Input data as array of objects with feature values",
+                        "description": "Array of test cases. Each object should have keys matching the model's feature_names (case-sensitive). Example: [{'Glucose': 120, 'BMI': 25.5, ...}]",
                     },
                 },
                 "required": ["model_id", "input_data"],
@@ -777,7 +802,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_list_models",
-            "description": "List all trained models available for inference",
+            "description": "List all trained models. Returns model IDs, names, algorithms, metrics, and feature_names needed for predictions. ALWAYS call this first to see available models and their required features.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -787,11 +812,11 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "ml_get_model_info",
-            "description": "Get information and metrics about a trained model",
+            "description": "Get detailed info about a specific model including metrics (accuracy, f1_score, etc.) and feature_names required for predictions.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "model_id": {"type": "string", "description": "ID of the model"},
+                    "model_id": {"type": "string", "description": "UUID of the model"},
                 },
                 "required": ["model_id"],
             },

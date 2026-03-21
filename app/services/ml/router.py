@@ -441,7 +441,7 @@ async def ml_upload_dataset(user_id: str, params: dict[str, Any], db: AsyncSessi
 
 
 async def ml_analyze_dataset(user_id: str, params: dict[str, Any], db: AsyncSession = None) -> dict:
-    """Analyze a dataset - auto-categorize columns, compute statistics."""
+    """Analyze a dataset - auto-categorize columns, compute statistics, and return sample rows."""
     try:
         dataset_id = UUID(str(params["dataset_id"]))
 
@@ -452,6 +452,30 @@ async def ml_analyze_dataset(user_id: str, params: dict[str, Any], db: AsyncSess
 
         # Analyze
         analysis = analyze_dataset(df)
+
+        # Add helpful hints for the agent
+        analysis["all_column_names"] = list(df.columns)
+
+        # Include sample rows so the agent can understand the data structure
+        sample_rows = df.head(5).to_dict(orient="records")
+        # Convert any non-serializable types to strings
+        for row in sample_rows:
+            for key, value in row.items():
+                if not isinstance(value, (str, int, float, bool, type(None))):
+                    row[key] = str(value)
+        analysis["sample_rows"] = sample_rows
+        analysis["total_rows"] = len(df)
+        analysis["total_columns"] = len(df.columns)
+
+        # Column dtypes for schema understanding
+        analysis["column_dtypes"] = {col: str(dtype) for col, dtype in df.dtypes.items()}
+
+        analysis["hint"] = (
+            "Column names are CASE-SENSITIVE. Use exact names from 'all_column_names' for target_column. "
+            "Look at 'sample_rows' to understand the data values. "
+            "For classification: choose the column with few unique values (2-10) as target. "
+            "For regression: choose a numeric column as target."
+        )
         return analysis
 
     except Exception as e:
@@ -797,7 +821,8 @@ async def ml_list_models(user_id: str, params: dict[str, Any], db: AsyncSession 
                     "created_at": m.created_at.isoformat(),
                 }
                 for m in models
-            ]
+            ],
+            "hint": "For ml_predict, use the 'id' field as model_id. Provide input_data as an array of objects with keys matching 'feature_names' exactly.",
         }
 
     except Exception as e:
@@ -819,15 +844,76 @@ async def ml_list_datasets(user_id: str, params: dict[str, Any], db: AsyncSessio
                     "name": d.name,
                     "file_type": d.file_type,
                     "row_count": d.row_count,
-                    "columns": d.columns,
+                    # Extract just column names for easier reading by the agent
+                    "column_names": [col.get("name") if isinstance(col, dict) else col for col in (d.columns or [])],
                     "created_at": d.created_at.isoformat(),
                 }
                 for d in datasets
-            ]
+            ],
+            "hint": "Use the 'id' field (UUID) as dataset_id for training, NOT the 'name'. Column names are case-sensitive.",
         }
 
     except Exception as e:
         logger.error("Failed to list datasets: %s", e)
+        return {"error": str(e)}
+
+
+async def ml_list_algorithms(user_id: str, params: dict[str, Any], db: AsyncSession = None) -> dict:
+    """List all available ML algorithms with their hyperparameters."""
+    try:
+        supervised = get_supervised_algorithms()
+        unsupervised = get_unsupervised_algorithms()
+
+        return {
+            "supervised": {
+                "classification": [
+                    {
+                        "name": alg["name"],
+                        "hyperparameters": {
+                            k: {"default": v["default"], "min": v.get("min"), "max": v.get("max"), "options": v.get("options")}
+                            for k, v in alg["params"].items()
+                        },
+                    }
+                    for alg in supervised if alg["type"] == "classification"
+                ],
+                "regression": [
+                    {
+                        "name": alg["name"],
+                        "hyperparameters": {
+                            k: {"default": v["default"], "min": v.get("min"), "max": v.get("max"), "options": v.get("options")}
+                            for k, v in alg["params"].items()
+                        },
+                    }
+                    for alg in supervised if alg["type"] == "regression"
+                ],
+            },
+            "unsupervised": {
+                "clustering": [
+                    {
+                        "name": alg["name"],
+                        "hyperparameters": {
+                            k: {"default": v["default"], "min": v.get("min"), "max": v.get("max")}
+                            for k, v in alg["params"].items()
+                        },
+                    }
+                    for alg in unsupervised if alg["type"] == "clustering"
+                ],
+                "dimensionality_reduction": [
+                    {
+                        "name": alg["name"],
+                        "hyperparameters": {
+                            k: {"default": v["default"], "min": v.get("min"), "max": v.get("max")}
+                            for k, v in alg["params"].items()
+                        },
+                    }
+                    for alg in unsupervised if alg["type"] == "dimensionality_reduction"
+                ],
+            },
+            "hint": "Pass hyperparameters in the 'hyperparameters' field when training. E.g., for catboost: hyperparameters={iterations: 200, learning_rate: 0.05}",
+        }
+
+    except Exception as e:
+        logger.error("Failed to list algorithms: %s", e)
         return {"error": str(e)}
 
 

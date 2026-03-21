@@ -24,13 +24,24 @@ GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 OPENAI_API_BASE = "https://api.openai.com/v1"
 MAX_AGENT_ITERATIONS = 15
 
-SYSTEM_PROMPT = (
-    "You are an AI workflow automation agent. Execute the user's request by calling "
-    "the available tools in the right order. Think step by step about what actions "
-    "are needed, then call the tools to perform them. After completing all actions, "
-    "provide a clear summary of everything that was done, including any IDs or URLs "
-    "of created resources."
-)
+SYSTEM_PROMPT = """You are an AI workflow automation agent. Execute the user's request by calling the available tools in the right order.
+
+IMPORTANT WORKFLOW GUIDELINES:
+
+For ML/Data tasks:
+1. ALWAYS call ml_list_datasets FIRST to get correct dataset UUIDs and column names
+2. THEN call ml_analyze_dataset to see sample_rows, column_dtypes, and statistics - this helps you understand the data
+3. Dataset IDs are UUIDs (like "653aba52-91ed-49b9-85b6-6e6a93ee56ae"), NOT filenames
+4. Column names are CASE-SENSITIVE (e.g., "Outcome" not "outcome") - use exact names from all_column_names
+5. If you need to know hyperparameters, call ml_list_algorithms
+6. For predictions, call ml_list_models first to get model UUID and feature_names
+
+For all tasks:
+- Think step by step about what actions are needed
+- Call tools in the correct sequence, using outputs from previous calls
+- After completing all actions, provide a clear summary including IDs, metrics, and results
+- If a tool returns an error, analyze the error message and retry with corrected parameters
+"""
 
 
 class WorkflowEngine:
