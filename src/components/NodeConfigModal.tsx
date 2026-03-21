@@ -15,6 +15,7 @@ import EmailTriggerConfig from './nodes/EmailTriggerConfig';
 import NewsTriggerConfig from './nodes/NewsTriggerConfig';
 import SlackConfig from './nodes/SlackConfig';
 import TelegramConfig from './nodes/TelegramConfig';
+import S3Config from './nodes/S3Config';
 
 interface Node {
     id: string;
@@ -68,6 +69,9 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <SlackConfig initialData={node.data} onSave={handleSave} />;
             case 'telegram':
                 return <TelegramConfig initialData={node.data} onSave={handleSave} />;
+            case 's3':
+            case 'aws':
+                return <S3Config initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
