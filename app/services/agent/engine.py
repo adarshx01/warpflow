@@ -133,7 +133,7 @@ class WorkflowEngine:
             credential_id = node_data.get("credentialId")
 
             if not credential_id:
-                # Special case: Slack and Telegram use a bot token from node.data directly
+                # Slack and Telegram: bot token from node.data
                 if node_type in ("slack", "telegram"):
                     token = node.get("_slack_token", "") or node_data.get("botToken", "")
                     if token:
@@ -142,6 +142,19 @@ class WorkflowEngine:
                         registered_types.add(node_type)
                     else:
                         logger.warning("%s node has no botToken configured, skipping", node_type)
+                # S3: AWS credentials from node.data
+                elif node_type == "s3":
+                    import json as _json
+                    access_key = node_data.get("accessKey", "")
+                    secret_key = node_data.get("secretKey", "")
+                    region = node_data.get("region", "us-east-1")
+                    if access_key and secret_key:
+                        cred = _json.dumps({"access_key": access_key, "secret_key": secret_key, "region": region})
+                        for tool_def in TOOL_REGISTRY["s3"]:
+                            self._tool_map[tool_def["name"]] = (tool_def["_fn"], cred)
+                        registered_types.add("s3")
+                    else:
+                        logger.warning("S3 node has no accessKey/secretKey configured, skipping")
                 else:
                     logger.warning(
                         "Node %s (%s) has no credentialId configured, skipping",

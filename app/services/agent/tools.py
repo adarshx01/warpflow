@@ -50,8 +50,18 @@ from app.services.telegram.service import (
     telegram_get_file, telegram_answer_callback_query,
     telegram_set_webhook, telegram_delete_webhook, telegram_get_webhook_info,
 )
+from app.services.aws.s3_service import (
+    s3_upload_text, s3_download_as_text, s3_delete_object, s3_copy_object,
+    s3_move_object, s3_get_object_metadata,
+    s3_list_objects, s3_list_buckets,
+    s3_generate_presigned_url, s3_generate_presigned_post,
+    s3_create_bucket, s3_delete_bucket, s3_get_bucket_location,
+    s3_get_object_acl, s3_put_object_acl,
+    s3_get_bucket_versioning, s3_put_bucket_versioning, s3_list_object_versions,
+    s3_get_object_tags, s3_put_object_tags, s3_delete_object_tags,
+    s3_put_bucket_website, s3_get_bucket_website, s3_delete_bucket_website,
+)
 
-ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
 
 # Wrapper for auto-confirming destructive operations
@@ -1003,6 +1013,227 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
             "description": "Get current Telegram webhook configuration and status.",
             "parameters": {"type": "object", "properties": {}, "required": []},
             "_fn": telegram_get_webhook_info,
+        },
+    ],
+    "s3": [
+        {
+            "name": "s3_upload_text",
+            "description": "Upload a text string or JSON as a file to an S3 bucket.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path, e.g. 'reports/summary.txt'"},
+                "content": {"type": "string", "description": "Text content to upload"},
+                "content_type": {"type": "string", "description": "MIME type, e.g. text/plain, application/json"},
+            }, "required": ["bucket", "key", "content"]},
+            "_fn": s3_upload_text,
+        },
+        {
+            "name": "s3_download_as_text",
+            "description": "Download an S3 object and return its content as a text string.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_download_as_text,
+        },
+        {
+            "name": "s3_delete_object",
+            "description": "Delete an object from an S3 bucket.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_delete_object,
+        },
+        {
+            "name": "s3_copy_object",
+            "description": "Copy an S3 object, optionally to a different bucket.",
+            "parameters": {"type": "object", "properties": {
+                "source_bucket": {"type": "string", "description": "Source bucket"},
+                "source_key": {"type": "string", "description": "Source key"},
+                "dest_bucket": {"type": "string", "description": "Destination bucket"},
+                "dest_key": {"type": "string", "description": "Destination key"},
+            }, "required": ["source_bucket", "source_key", "dest_bucket", "dest_key"]},
+            "_fn": s3_copy_object,
+        },
+        {
+            "name": "s3_move_object",
+            "description": "Move an S3 object (copy to new location then delete original).",
+            "parameters": {"type": "object", "properties": {
+                "source_bucket": {"type": "string", "description": "Source bucket"},
+                "source_key": {"type": "string", "description": "Source key"},
+                "dest_bucket": {"type": "string", "description": "Destination bucket"},
+                "dest_key": {"type": "string", "description": "Destination key"},
+            }, "required": ["source_bucket", "source_key", "dest_bucket", "dest_key"]},
+            "_fn": s3_move_object,
+        },
+        {
+            "name": "s3_get_object_metadata",
+            "description": "Get metadata (size, content-type, ETag, last-modified) for an S3 object without downloading it.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_get_object_metadata,
+        },
+        {
+            "name": "s3_list_objects",
+            "description": "List objects in an S3 bucket, optionally filtered by prefix.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "prefix": {"type": "string", "description": "Filter by prefix, e.g. 'reports/'"},
+                "max_keys": {"type": "integer", "description": "Maximum number of objects to return (default 100)"},
+            }, "required": ["bucket"]},
+            "_fn": s3_list_objects,
+        },
+        {
+            "name": "s3_list_buckets",
+            "description": "List all S3 buckets in the AWS account.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+            "_fn": s3_list_buckets,
+        },
+        {
+            "name": "s3_generate_presigned_url",
+            "description": "Generate a temporary presigned URL for public GET access to an S3 object.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+                "expires_in": {"type": "integer", "description": "URL expiry in seconds (default 3600)"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_generate_presigned_url,
+        },
+        {
+            "name": "s3_generate_presigned_post",
+            "description": "Generate a presigned POST URL allowing direct browser-to-S3 file uploads.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path for the upload"},
+                "expires_in": {"type": "integer", "description": "URL expiry in seconds (default 3600)"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_generate_presigned_post,
+        },
+        {
+            "name": "s3_create_bucket",
+            "description": "Create a new S3 bucket in the configured region.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "Bucket name (globally unique, lowercase, no spaces)"},
+            }, "required": ["bucket"]},
+            "_fn": s3_create_bucket,
+        },
+        {
+            "name": "s3_delete_bucket",
+            "description": "Delete an S3 bucket. The bucket must be empty first.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "Bucket name to delete"},
+            }, "required": ["bucket"]},
+            "_fn": s3_delete_bucket,
+        },
+        {
+            "name": "s3_get_bucket_location",
+            "description": "Get the AWS region where an S3 bucket is hosted.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+            }, "required": ["bucket"]},
+            "_fn": s3_get_bucket_location,
+        },
+        {
+            "name": "s3_get_object_acl",
+            "description": "Get the Access Control List (ACL) of an S3 object.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_get_object_acl,
+        },
+        {
+            "name": "s3_put_object_acl",
+            "description": "Set the ACL of an S3 object (private, public-read, public-read-write, authenticated-read).",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+                "acl": {"type": "string", "description": "ACL: private | public-read | public-read-write | authenticated-read"},
+            }, "required": ["bucket", "key", "acl"]},
+            "_fn": s3_put_object_acl,
+        },
+        {
+            "name": "s3_get_bucket_versioning",
+            "description": "Get the versioning status of an S3 bucket.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+            }, "required": ["bucket"]},
+            "_fn": s3_get_bucket_versioning,
+        },
+        {
+            "name": "s3_put_bucket_versioning",
+            "description": "Enable or suspend versioning on an S3 bucket.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "enable": {"type": "boolean", "description": "True to enable versioning, false to suspend"},
+            }, "required": ["bucket", "enable"]},
+            "_fn": s3_put_bucket_versioning,
+        },
+        {
+            "name": "s3_list_object_versions",
+            "description": "List all versions of objects in an S3 bucket (requires versioning enabled).",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "prefix": {"type": "string", "description": "Filter by key prefix"},
+            }, "required": ["bucket"]},
+            "_fn": s3_list_object_versions,
+        },
+        {
+            "name": "s3_get_object_tags",
+            "description": "Get all tags on an S3 object.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_get_object_tags,
+        },
+        {
+            "name": "s3_put_object_tags",
+            "description": "Set tags on an S3 object. Provide tags as a key-value dict.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+                "tags": {"type": "object", "description": "Tags as {key: value} dict"},
+            }, "required": ["bucket", "key", "tags"]},
+            "_fn": s3_put_object_tags,
+        },
+        {
+            "name": "s3_delete_object_tags",
+            "description": "Remove all tags from an S3 object.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key/path"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_delete_object_tags,
+        },
+        {
+            "name": "s3_put_bucket_website",
+            "description": "Configure an S3 bucket as a static website with index and error documents.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "index_document": {"type": "string", "description": "Index document name (default: index.html)"},
+                "error_document": {"type": "string", "description": "Error document name (default: error.html)"},
+            }, "required": ["bucket"]},
+            "_fn": s3_put_bucket_website,
+        },
+        {
+            "name": "s3_get_bucket_website",
+            "description": "Get the static website hosting configuration of an S3 bucket.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+            }, "required": ["bucket"]},
+            "_fn": s3_get_bucket_website,
+        },
+        {
+            "name": "s3_delete_bucket_website",
+            "description": "Remove the static website hosting configuration from an S3 bucket.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+            }, "required": ["bucket"]},
+            "_fn": s3_delete_bucket_website,
         },
     ],
 }
