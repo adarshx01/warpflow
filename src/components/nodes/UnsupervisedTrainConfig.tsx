@@ -256,7 +256,7 @@ const UnsupervisedTrainConfig: React.FC<UnsupervisedTrainConfigProps> = ({ initi
                         {selectedDataset && (
                             <Field label="Feature Columns" hint="Select features or leave empty to use all numeric">
                                 <div className="max-h-32 overflow-y-auto bg-slate-800/40 rounded-xl p-2 space-y-1">
-                                    {selectedDataset.columns.map((c) => (
+                                    {selectedDataset?.columns?.map((c) => (
                                         <label
                                             key={c.name}
                                             className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-700/30 cursor-pointer"
