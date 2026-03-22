@@ -362,9 +362,7 @@ def train_unsupervised_model(
 
         # Cluster sizes
         unique_labels, counts = np.unique(labels, return_counts=True)
-        metrics["cluster_sizes"] = {
-            int(label): int(count) for label, count in zip(unique_labels, counts)
-        }
+        metrics["cluster_sizes"] = [int(count) for count in counts]
 
         # Silhouette score (only if we have more than 1 cluster)
         if n_clusters > 1 and len(X) > n_clusters:
