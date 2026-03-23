@@ -1,135 +1,165 @@
-# Stratify Labs Vision Platform
+# CV Service - Computer Vision Microservice
 
-**A comprehensive platform for computer vision tasks including training, inference, and model management.**
-
----
-
-## 🌟 Features
-
-- **Training Service**: Train models for classification, detection, and segmentation tasks.
-- **Inference Service**: Perform real-time inference with webcam or video inputs.
-- **Model Management**: Load, save, and switch between different models.
-- **Unified Interface**: Control both services from a single application.
+**A unified microservice for computer vision training and inference, designed to run with GPU support.**
 
 ---
 
-## 🛠 Installation
+## Overview
 
-### Prerequisites
+The CV Service is a standalone microservice that provides:
+- **Model Training**: Classification, detection, and segmentation
+- **Real-time Inference**: Webcam streaming with model predictions
+- **Model Management**: Load, save, and switch between trained models
 
-- Python 3.10+
-- CUDA-compatible GPU (recommended for training)
+Runs on a **single port (8080)** with proper routing for both training and inference.
 
-### Setup
+---
+
+## Quick Start
+
+### Local Development (CPU)
 
 ```bash
-git clone https://github.com/adarshx01/StratifyLabs.git
-cd StratifyLabs-Server
-pip install -r requirements.txt
+cd warpcore/app/services/cv
+
+# Install dependencies with UV
+uv pip install -r requirements.txt
+
+# Run the service
+python main.py --port 8080
+```
+
+### Docker (CPU)
+
+```bash
+# Build and run
+docker-compose up -d cv-service
+
+# Check health
+curl http://localhost:8080/health
+```
+
+### Docker (GPU - NVIDIA)
+
+```bash
+# Requires NVIDIA Docker runtime
+docker-compose --profile gpu up -d
+
+# Verify GPU access
+curl http://localhost:8080/health
+# Returns: {"status":"healthy","gpu_available":true,"device":"cuda"}
 ```
 
 ---
 
-## 🚀 Usage
+## API Endpoints
 
-### Running the Application
+### Health & Status
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check with GPU status |
+| `/alive` | GET | Legacy alive check |
+
+### Training
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/training/tasks` | GET | Get available tasks and models |
+| `/training/train` | POST | Start model training |
+
+### Inference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/inference/models/available` | GET | List available model architectures |
+| `/inference/models/current` | GET | Get currently loaded model info |
+| `/inference/models/load` | POST | Load a model for inference |
+| `/inference/models/saved` | GET | List saved model files |
+| `/inference/video_feed` | GET | MJPEG video stream |
+| `/inference/detection/latest` | GET | Latest detection results |
+| `/inference/detection/stream` | WebSocket | Real-time detection stream |
+
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CV_MODEL_BASE_PATH` | `./saved_models` | Path for saved models |
+| `PYTHONUNBUFFERED` | `1` | Unbuffered Python output |
+
+### Command Line Arguments
 
 ```bash
-# Start both training and inference services
-python main.py
-
-# Start only the inference service
-python main.py --disable-training
-
-# Start only the training service
-python main.py --disable-inference
-```
-
-### Command-Line Arguments
-
-- `--inference-port`: Port for inference service (default: 8001)
-- `--training-port`: Port for training service (default: 8000)
-- `--disable-inference`: Disable the inference service
-- `--disable-training`: Disable the training service
-- `--model`: Model name for inference
-- `--task`: Task type (`classification`, `detection`, `segmentation`)
-- `--model-path`: Path to the model weights file
-- `--dataset`: Path to dataset for class names
-- `--num-classes`: Number of classes (for segmentation)
-
-### Using Docker
-
-```bash
-# Build the Docker image
-docker build -t stratify-vision .
-
-# Run the container
-docker run -p 8000:8000 -p 8001:8001 stratify-vision
+python main.py \
+    --port 8080 \           # Service port
+    --host 0.0.0.0 \        # Bind address
+    --reload \              # Auto-reload for development
+    --task classification \ # Preload model task type
+    --model resnet \        # Preload model name
+    --model-path ./model.pt # Preload model path
 ```
 
 ---
 
-## 📡 API Endpoints
+## Integration with WarpCore
 
-### Training Service
+Set the `CV_SERVICE_URL` environment variable in your warpcore `.env`:
 
-- `GET /alive`: Check if the training service is running
-- `POST /train`: Start training a model
+```env
+CV_SERVICE_URL=http://localhost:8080
+```
 
-### Inference Service
-
-- `GET /video_feed`: Stream video with inference results
-- `GET /api/models/available`: Get list of available models
-- `GET /api/models/current`: Get currently loaded model info
-- `POST /api/models/load`: Load a model for inference
-- `GET /api/detection/latest`: Fetch latest detection results
-- `WebSocket /api/detection/stream`: Stream detection results in real-time
+The warpcore backend will proxy requests through `/api/cv/*` to the CV service.
 
 ---
 
-## ✅ Supported Models
+## AWS GPU Deployment
+
+See [AWS_GPU_DEPLOYMENT.md](./AWS_GPU_DEPLOYMENT.md) for detailed instructions on:
+- Selecting GPU instances (g4dn, g5, p3, p4d)
+- Setting up NVIDIA Docker runtime
+- Cost optimization with Spot instances
+- Monitoring and troubleshooting
+
+---
+
+## Supported Models
 
 ### Classification
-
-- ResNet  
-- EfficientNet  
-- VGG  
-- Inception  
-- MobileNet  
-- DenseNet  
-- ViT  
-- ConvNeXt
+ResNet, EfficientNet, VGG, Inception, MobileNet, DenseNet, ViT, ConvNeXt
 
 ### Detection
-
-- YOLOv3/v4/v5/v8  
-- Faster R-CNN  
-- SSD  
-- RetinaNet  
-- EfficientDet  
-- DETR  
-- Mask R-CNN
+YOLOv3/v4/v5/v8, Faster R-CNN, SSD, RetinaNet, EfficientDet, DETR, Mask R-CNN
 
 ### Segmentation
-
-- UNet  
-- DeepLabv3  
-- PSPNet  
-- SegNet  
-- FCN  
-- Mask R-CNN  
-- YOLACT  
-- SegFormer  
-- Mask2Former
+UNet, DeepLabv3, PSPNet, SegNet, FCN, Mask R-CNN, YOLACT, SegFormer, Mask2Former
 
 ---
 
-## 📄 License
+## Project Structure
 
-This project is licensed under the **MIT License**.
+```
+cv/
+├── main.py                 # Unified FastAPI application
+├── requirements.txt        # Python dependencies (UV compatible)
+├── Dockerfile              # Multi-stage build (CPU & GPU)
+├── docker-compose.yml      # Container orchestration
+├── AWS_GPU_DEPLOYMENT.md   # AWS deployment guide
+├── training/
+│   ├── visiontrain.py      # Training logic and models
+│   └── arch.py             # Model architectures
+├── inference/
+│   ├── inference_engine.py # Inference engine
+│   └── unified_stream.py   # Video streaming
+└── saved_models/           # Trained model storage
+```
 
 ---
 
-## 🤝 Contributing
+## License
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+MIT License

@@ -56,6 +56,24 @@ def _validate_key(secret_key: str) -> None:
         )
 
 
+async def get_secret_value(user_id: int, secret_key: str) -> str | None:
+    """
+    Retrieve decrypted secret value for internal service use.
+    Returns None if the secret doesn't exist.
+    """
+    from app.database import async_session
+
+    async with async_session() as db:
+        stmt = select(UserSecret).where(
+            UserSecret.owner_id == user_id,
+            UserSecret.secret_key == secret_key,
+        )
+        secret = (await db.execute(stmt)).scalar_one_or_none()
+        if not secret:
+            return None
+        return decrypt_value(secret.encrypted_value)
+
+
 @router.get("/{secret_key}", response_model=SecretGetResponse)
 async def get_secret(
     secret_key: str,

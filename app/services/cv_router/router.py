@@ -1,7 +1,7 @@
 """
 Computer Vision service router.
 Provides endpoints for CV model training and inference.
-Communicates with the standalone CV training/inference services.
+Communicates with the unified CV microservice.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -18,9 +18,8 @@ from app.services.secrets_router import get_secret_value
 
 router = APIRouter(prefix="/api/cv", tags=["Computer Vision"])
 
-# Default service URLs (can be overridden via environment variables)
-CV_TRAINING_URL = os.getenv("CV_TRAINING_URL", "http://localhost:8000")
-CV_INFERENCE_URL = os.getenv("CV_INFERENCE_URL", "http://localhost:8001")
+# Single CV service URL (unified service)
+CV_SERVICE_URL = os.getenv("CV_SERVICE_URL", "http://localhost:8080")
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────
@@ -133,25 +132,16 @@ async def download_from_s3(user_id: int, s3_path: str, local_path: str) -> str:
 
 @router.get("/alive")
 async def check_alive():
-    """Check if the CV training service is alive."""
+    """Check if the CV service is alive."""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{CV_TRAINING_URL}/alive")
+            response = await client.get(f"{CV_SERVICE_URL}/health")
             if response.status_code == 200:
-                return {"status": "alive", "service": "training"}
+                return response.json()
     except Exception:
         pass
 
-    # Try inference service
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{CV_INFERENCE_URL}/api/models/current")
-            if response.status_code == 200:
-                return {"status": "alive", "service": "inference"}
-    except Exception:
-        pass
-
-    raise HTTPException(status_code=503, detail="CV services not available")
+    raise HTTPException(status_code=503, detail="CV service not available")
 
 
 @router.post("/train", response_model=CVTrainResponse)
@@ -164,11 +154,11 @@ async def train_cv_model(
     if not os.path.exists(request.dataset_path):
         raise HTTPException(status_code=400, detail=f"Dataset path does not exist: {request.dataset_path}")
 
-    # Send training request to CV training service
+    # Send training request to CV service
     try:
         async with httpx.AsyncClient(timeout=None) as client:  # No timeout for training
             response = await client.post(
-                f"{CV_TRAINING_URL}/train",
+                f"{CV_SERVICE_URL}/training/train",
                 json={
                     "task": request.task,
                     "model": request.model,
@@ -185,7 +175,7 @@ async def train_cv_model(
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"CV training service error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"CV service error: {str(e)}")
 
     model_path = result.get("model_saved_at", "")
     s3_path = None
@@ -204,10 +194,10 @@ async def train_cv_model(
 
 @router.get("/models/saved")
 async def get_saved_models():
-    """Get list of saved CV models from the inference service."""
+    """Get list of saved CV models from the CV service."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{CV_INFERENCE_URL}/api/models/saved")
+            response = await client.get(f"{CV_SERVICE_URL}/inference/models/saved")
             response.raise_for_status()
             return response.json()
     except Exception as e:
@@ -220,7 +210,7 @@ async def get_available_models():
     """Get available model architectures for each task type."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{CV_INFERENCE_URL}/api/models/available")
+            response = await client.get(f"{CV_SERVICE_URL}/inference/models/available")
             response.raise_for_status()
             return response.json()
     except Exception:
@@ -249,7 +239,7 @@ async def load_model(request: CVLoadModelRequest):
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                f"{CV_INFERENCE_URL}/api/models/load",
+                f"{CV_SERVICE_URL}/inference/models/load",
                 json={
                     "task_type": request.task_type,
                     "model_name": request.model_name,
@@ -263,7 +253,7 @@ async def load_model(request: CVLoadModelRequest):
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"CV inference service error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"CV service error: {str(e)}")
 
 
 @router.post("/models/download-s3")
@@ -290,7 +280,7 @@ async def get_current_model():
     """Get information about the currently loaded model."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{CV_INFERENCE_URL}/api/models/current")
+            response = await client.get(f"{CV_SERVICE_URL}/inference/models/current")
             response.raise_for_status()
             return response.json()
     except Exception as e:
@@ -305,39 +295,37 @@ async def run_inference(request: CVInferRequest):
             raise HTTPException(status_code=400, detail=f"Image file not found: {request.image_path}")
 
     if request.input_type == "webcam":
-        # For webcam, just return the video feed URL
+        # For webcam, return the video feed URL
         return CVInferResponse(
             status="streaming",
-            predictions={"video_feed_url": f"{CV_INFERENCE_URL}/video_feed"},
+            predictions={"video_feed_url": f"{CV_SERVICE_URL}/inference/video_feed"},
         )
 
-    # For file/URL inference, we need to implement image processing
-    # The current inference service uses video streaming, so we'll need to adapt
+    # For file/URL inference, use the new process_image endpoint
     try:
-        # If it's a URL, download the image first
-        if request.input_type == "url" and request.image_url:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                img_response = await client.get(request.image_url)
-                img_response.raise_for_status()
-
-                # Save temporarily
-                import tempfile
-                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
-                    f.write(img_response.content)
-                    temp_path = f.name
-
-                request.image_path = temp_path
-
-        # Send inference request
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(f"{CV_INFERENCE_URL}/api/detection/latest")
+            response = await client.post(
+                f"{CV_SERVICE_URL}/inference/process_image",
+                json={
+                    "image_path": request.image_path,
+                    "image_url": request.image_url,
+                    "confidence_threshold": request.confidence_threshold
+                }
+            )
             response.raise_for_status()
             result = response.json()
 
-        return CVInferResponse(
-            status=result.get("status", "success"),
-            predictions=result,
-        )
+        if result.get("status") == "success":
+            return CVInferResponse(
+                status="success",
+                predictions=result.get("predictions"),
+                annotated_image=result.get("annotated_image")
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=result.get("message", "Inference failed")
+            )
 
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
@@ -351,11 +339,11 @@ async def cv_train_model(user_id: int, params: Dict[str, Any]) -> Dict:
     """Agent tool: Train a CV model."""
     request = CVTrainRequest(**params)
 
-    # Send training request to CV training service
+    # Send training request to CV service
     try:
         async with httpx.AsyncClient(timeout=None) as client:
             response = await client.post(
-                f"{CV_TRAINING_URL}/train",
+                f"{CV_SERVICE_URL}/training/train",
                 json={
                     "task": request.task,
                     "model": request.model,
@@ -401,7 +389,7 @@ async def cv_load_model(user_id: int, params: Dict[str, Any]) -> Dict:
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                f"{CV_INFERENCE_URL}/api/models/load",
+                f"{CV_SERVICE_URL}/inference/models/load",
                 json={
                     "task_type": params.get("task_type"),
                     "model_name": params.get("model_name"),
@@ -422,23 +410,41 @@ async def cv_infer(user_id: int, params: Dict[str, Any]) -> Dict:
         input_type = params.get("input_type", "file")
         image_path = params.get("image_path")
         image_url = params.get("image_url")
+        confidence_threshold = params.get("confidence_threshold", 0.5)
 
-        # If it's a URL, download the image first
-        if input_type == "url" and image_url:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                img_response = await client.get(image_url)
-                img_response.raise_for_status()
+        # For webcam, return the video feed URL
+        if input_type == "webcam":
+            return {
+                "status": "streaming",
+                "message": "Webcam inference active",
+                "video_feed_url": f"{CV_SERVICE_URL}/inference/video_feed",
+                "instructions": "Open the video_feed_url in a browser to see real-time inference"
+            }
 
-                import tempfile
-                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
-                    f.write(img_response.content)
-                    image_path = f.name
-
-        # Get latest detection results
+        # For single image inference (file or URL)
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(f"{CV_INFERENCE_URL}/api/detection/latest")
+            response = await client.post(
+                f"{CV_SERVICE_URL}/inference/process_image",
+                json={
+                    "image_path": image_path,
+                    "image_url": image_url,
+                    "confidence_threshold": confidence_threshold
+                }
+            )
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+
+            if result.get("status") == "success":
+                return {
+                    "status": "success",
+                    "message": "Inference completed successfully",
+                    "annotated_image": result.get("annotated_image"),
+                    "predictions": result.get("predictions"),
+                    "task_type": result.get("task_type"),
+                    "model_name": result.get("model_name")
+                }
+            else:
+                return result
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -448,7 +454,7 @@ async def cv_list_models(user_id: int, params: Dict[str, Any]) -> Dict:
     """Agent tool: List available CV models."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{CV_INFERENCE_URL}/api/models/saved")
+            response = await client.get(f"{CV_SERVICE_URL}/inference/models/saved")
             response.raise_for_status()
             return response.json()
     except Exception as e:

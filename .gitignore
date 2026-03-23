@@ -9,3 +9,5 @@ wheels/
 # Virtual environments
 .venv
 .env
+app/services/cv/main.py
+app/services/cv/training/saved_models/classification/resnet_adam_20260323_143023.pt

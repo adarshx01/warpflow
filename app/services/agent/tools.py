@@ -1037,7 +1037,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         },
         {
             "name": "cv_infer",
-            "description": "Run CV inference on an image. Supports local file paths and image URLs. Returns predictions with class labels, bounding boxes, or segmentation masks depending on task type.",
+            "description": "Run CV inference on an image. Supports local file paths, image URLs, and webcam. Returns predictions (class labels, bounding boxes, or segmentation masks) AND an annotated image showing the detected objects/segments visually overlaid on the original image. The annotated_image is returned as a base64-encoded data URL that can be displayed directly.",
             "parameters": {
                 "type": "object",
                 "properties": {

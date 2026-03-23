@@ -35,6 +35,13 @@ For ML/Data tasks:
 4. Column names are CASE-SENSITIVE (e.g., "Outcome" not "outcome")
 5. For predictions, call ml_list_models first to get model UUID and feature_names
 
+For CV (Computer Vision) tasks:
+1. CHECK NODE CONFIGURATIONS FIRST - Use configured values for task_type, model_name, dataset_path, epochs, etc.
+2. For training: Use the configured task_type (classification/detection/segmentation), model_name, dataset_path, and training parameters
+3. For inference: First call cv_load_model with configured task_type, model_name, and model_source, then call cv_infer
+4. If custom_model_name is configured, use it when saving the model
+5. For image inference: Use the configured image_url or image_path directly
+
 For all tasks:
 - Use pre-configured values from node configurations when available
 - Think step by step about what actions are needed
@@ -115,6 +122,90 @@ class WorkflowEngine:
                 # Model ID (for inference)
                 if node_data.get("model_id"):
                     config_info["model_id"] = node_data["model_id"]
+
+            # Extract CV Training configurations
+            elif node_type == "cv-train":
+                # Task type (classification, detection, segmentation)
+                if node_data.get("task_type"):
+                    config_info["task_type"] = node_data["task_type"]
+
+                # Model architecture
+                if node_data.get("model_name"):
+                    config_info["model_name"] = node_data["model_name"]
+
+                # Dataset path
+                if node_data.get("dataset_path"):
+                    config_info["dataset_path"] = node_data["dataset_path"]
+
+                # Dataset format
+                if node_data.get("dataset_format"):
+                    config_info["dataset_format"] = node_data["dataset_format"]
+
+                # Training parameters
+                if node_data.get("epochs"):
+                    config_info["epochs"] = node_data["epochs"]
+                if node_data.get("batch_size"):
+                    config_info["batch_size"] = node_data["batch_size"]
+                if node_data.get("learning_rate"):
+                    config_info["learning_rate"] = node_data["learning_rate"]
+                if node_data.get("optimizer"):
+                    config_info["optimizer"] = node_data["optimizer"]
+                if node_data.get("image_size"):
+                    config_info["image_size"] = node_data["image_size"]
+
+                # Data split
+                if node_data.get("train_pct"):
+                    config_info["train_pct"] = node_data["train_pct"]
+                if node_data.get("val_pct"):
+                    config_info["val_pct"] = node_data["val_pct"]
+                if node_data.get("test_pct"):
+                    config_info["test_pct"] = node_data["test_pct"]
+
+                # Save options
+                if node_data.get("save_local") is not None:
+                    config_info["save_local"] = node_data["save_local"]
+                if node_data.get("upload_to_s3") is not None:
+                    config_info["upload_to_s3"] = node_data["upload_to_s3"]
+                if node_data.get("s3_model_path"):
+                    config_info["s3_model_path"] = node_data["s3_model_path"]
+                if node_data.get("custom_model_name"):
+                    config_info["custom_model_name"] = node_data["custom_model_name"]
+
+            # Extract CV Inference configurations
+            elif node_type == "cv-inference":
+                # Task type
+                if node_data.get("task_type"):
+                    config_info["task_type"] = node_data["task_type"]
+
+                # Model architecture
+                if node_data.get("model_name"):
+                    config_info["model_name"] = node_data["model_name"]
+
+                # Model source and paths
+                if node_data.get("model_source"):
+                    config_info["model_source"] = node_data["model_source"]
+                if node_data.get("model_path"):
+                    config_info["model_path"] = node_data["model_path"]
+                if node_data.get("s3_model_path"):
+                    config_info["s3_model_path"] = node_data["s3_model_path"]
+                if node_data.get("selected_saved_model"):
+                    config_info["selected_saved_model"] = node_data["selected_saved_model"]
+
+                # Input configuration
+                if node_data.get("input_type"):
+                    config_info["input_type"] = node_data["input_type"]
+                if node_data.get("image_path"):
+                    config_info["image_path"] = node_data["image_path"]
+                if node_data.get("image_url"):
+                    config_info["image_url"] = node_data["image_url"]
+
+                # Model parameters
+                if node_data.get("num_classes"):
+                    config_info["num_classes"] = node_data["num_classes"]
+                if node_data.get("dataset_path"):
+                    config_info["dataset_path"] = node_data["dataset_path"]
+                if node_data.get("confidence_threshold"):
+                    config_info["confidence_threshold"] = node_data["confidence_threshold"]
 
             # Only add if we have actual config values beyond just node_type
             if len(config_info) > 1:
@@ -275,9 +366,12 @@ class WorkflowEngine:
 
         fn, token = self._tool_map[tool_name]
         try:
-            # Credential-less tools (ML, Context) need db session
+            # Credential-less tools (ML, Context, CV) need db session or just user_id
             if tool_name.startswith("ml_") or tool_name.startswith("context_"):
                 result = await fn(token, args, self.db)
+            elif tool_name.startswith("cv_"):
+                # CV tools take (user_id, params) - no db session needed
+                result = await fn(token, args)
             else:
                 result = await fn(token, args)
             self._steps.append({"tool": tool_name, "params": args, "result": result})
