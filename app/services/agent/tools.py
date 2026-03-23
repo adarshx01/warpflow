@@ -36,6 +36,9 @@ from app.services.context.router import (
     context_upload_document, context_query, context_list_documents,
     context_delete_document, context_clear_collection, context_list_collections,
 )
+from app.services.cv_router.router import (
+    cv_train_model, cv_load_model, cv_infer, cv_list_models,
+)
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
@@ -47,6 +50,8 @@ CREDENTIAL_LESS_TOOLS = {
     "unsupervised-train",
     "model-inference",
     "context-store",
+    "cv-train",
+    "cv-inference",
 }
 
 
@@ -901,6 +906,172 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "required": [],
             },
             "_fn": context_list_collections,
+        },
+    ],
+    "cv-train": [
+        {
+            "name": "cv_train_model",
+            "description": "Train a computer vision model. Supports classification (ResNet, EfficientNet, VGG, MobileNet, DenseNet, ViT, ConvNeXt), detection (Faster R-CNN, SSD, RetinaNet, YOLOv5, YOLOv8), and segmentation (U-Net, DeepLabV3, FCN, PSPNet, Mask R-CNN). IMPORTANT: Provide absolute path to dataset folder.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "enum": ["classification", "detection", "segmentation"],
+                        "description": "CV task type",
+                    },
+                    "model": {
+                        "type": "string",
+                        "description": "Model architecture (e.g., resnet, yolov8, unet)",
+                    },
+                    "dataset_path": {
+                        "type": "string",
+                        "description": "Absolute path to the dataset folder",
+                    },
+                    "epochs": {
+                        "type": "integer",
+                        "description": "Number of training epochs (default: 10)",
+                    },
+                    "optimizer": {
+                        "type": "string",
+                        "enum": ["adam", "sgd", "adamw", "rmsprop"],
+                        "description": "Optimizer to use (default: adam)",
+                    },
+                    "learning_rate": {
+                        "type": "number",
+                        "description": "Learning rate (default: 0.001)",
+                    },
+                    "batch_size": {
+                        "type": "integer",
+                        "description": "Batch size (default: 32)",
+                    },
+                    "image_size": {
+                        "type": "integer",
+                        "description": "Input image size (default: 224)",
+                    },
+                    "train_pct": {
+                        "type": "number",
+                        "description": "Training set percentage (default: 0.7)",
+                    },
+                    "val_pct": {
+                        "type": "number",
+                        "description": "Validation set percentage (default: 0.15)",
+                    },
+                    "test_pct": {
+                        "type": "number",
+                        "description": "Test set percentage (default: 0.15)",
+                    },
+                    "save_local": {
+                        "type": "boolean",
+                        "description": "Save model locally (default: true)",
+                    },
+                    "upload_to_s3": {
+                        "type": "boolean",
+                        "description": "Upload model to S3 (default: false)",
+                    },
+                    "s3_model_path": {
+                        "type": "string",
+                        "description": "S3 path for model upload",
+                    },
+                    "custom_model_name": {
+                        "type": "string",
+                        "description": "Custom name for the saved model",
+                    },
+                },
+                "required": ["task", "model", "dataset_path"],
+            },
+            "_fn": cv_train_model,
+        },
+        {
+            "name": "cv_list_models",
+            "description": "List all saved CV models available for inference",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": cv_list_models,
+        },
+    ],
+    "cv-inference": [
+        {
+            "name": "cv_load_model",
+            "description": "Load a CV model for inference. Can load from local path, saved models, or S3. IMPORTANT: Call this before running inference.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_type": {
+                        "type": "string",
+                        "enum": ["classification", "detection", "segmentation"],
+                        "description": "CV task type",
+                    },
+                    "model_name": {
+                        "type": "string",
+                        "description": "Model architecture (e.g., resnet, yolov8, unet)",
+                    },
+                    "model_path": {
+                        "type": "string",
+                        "description": "Local path to model weights (.pt file)",
+                    },
+                    "model_source": {
+                        "type": "string",
+                        "enum": ["local", "s3", "trained"],
+                        "description": "Where to load the model from",
+                    },
+                    "s3_model_path": {
+                        "type": "string",
+                        "description": "S3 path if loading from S3",
+                    },
+                    "dataset_path": {
+                        "type": "string",
+                        "description": "Path to dataset for class names (optional)",
+                    },
+                    "num_classes": {
+                        "type": "integer",
+                        "description": "Number of classes (required for segmentation)",
+                    },
+                },
+                "required": ["task_type", "model_name"],
+            },
+            "_fn": cv_load_model,
+        },
+        {
+            "name": "cv_infer",
+            "description": "Run CV inference on an image. Supports local file paths and image URLs. Returns predictions with class labels, bounding boxes, or segmentation masks depending on task type.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "input_type": {
+                        "type": "string",
+                        "enum": ["file", "url", "webcam"],
+                        "description": "Type of image input",
+                    },
+                    "image_path": {
+                        "type": "string",
+                        "description": "Local path to image file (for input_type=file)",
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "description": "URL of image (for input_type=url)",
+                    },
+                    "confidence_threshold": {
+                        "type": "number",
+                        "description": "Confidence threshold for predictions (default: 0.5)",
+                    },
+                },
+                "required": ["input_type"],
+            },
+            "_fn": cv_infer,
+        },
+        {
+            "name": "cv_list_models",
+            "description": "List all saved CV models with their paths and metadata",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": cv_list_models,
         },
     ],
 }
