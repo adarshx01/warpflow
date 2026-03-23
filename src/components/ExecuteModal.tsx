@@ -90,6 +90,8 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
             'google-docs', 'google-drive', 'gmail', 'google-sheets', 'google-forms',
             // ML Services
             'data-prep', 'supervised-train', 'unsupervised-train', 'model-inference',
+            // Computer Vision
+            'cv-train', 'cv-inference',
             // Other
             'context-store',
         ].includes(n.type)

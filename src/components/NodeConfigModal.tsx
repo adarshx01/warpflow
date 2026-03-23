@@ -14,6 +14,9 @@ import DataPrepConfig from './nodes/DataPrepConfig';
 import SupervisedTrainConfig from './nodes/SupervisedTrainConfig';
 import UnsupervisedTrainConfig from './nodes/UnsupervisedTrainConfig';
 import ModelInferenceConfig from './nodes/ModelInferenceConfig';
+// Computer Vision nodes
+import CVTrainConfig from './nodes/CVTrainConfig';
+import CVInferenceConfig from './nodes/CVInferenceConfig';
 
 interface Node {
     id: string;
@@ -64,6 +67,11 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <UnsupervisedTrainConfig initialData={node.data} onSave={handleSave} />;
             case 'model-inference':
                 return <ModelInferenceConfig initialData={node.data} onSave={handleSave} />;
+            // Computer Vision nodes
+            case 'cv-train':
+                return <CVTrainConfig initialData={node.data} onSave={handleSave} />;
+            case 'cv-inference':
+                return <CVInferenceConfig initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">

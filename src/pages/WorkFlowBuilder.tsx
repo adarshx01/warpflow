@@ -52,6 +52,10 @@ const nodeTypes: NodeType[] = [
   { id: 'unsupervised-train', name: 'Unsupervised Training', icon: '🔮', color: 'from-amber-400 via-yellow-400 to-lime-500', category: 'ML Training' },
   { id: 'model-inference', name: 'Model Inference', icon: '⚡', color: 'from-red-400 via-orange-400 to-amber-500', category: 'ML Training' },
 
+  // Computer Vision
+  { id: 'cv-train', name: 'CV Model Training', icon: '🧠', color: 'from-cyan-400 via-blue-500 to-indigo-600', category: 'Computer Vision' },
+  { id: 'cv-inference', name: 'CV Model Inference', icon: '👁️', color: 'from-emerald-400 via-teal-500 to-cyan-600', category: 'Computer Vision' },
+
   // Communication
   { id: 'slack', name: 'Slack', icon: '💬', color: 'from-purple-400 via-pink-400 to-rose-500', category: 'Communication' },
   { id: 'discord', name: 'Discord', icon: '🎮', color: 'from-indigo-400 via-purple-400 to-pink-500', category: 'Communication' },
