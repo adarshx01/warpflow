@@ -91,7 +91,7 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
             // ML Services
             'data-prep', 'supervised-train', 'unsupervised-train', 'model-inference',
             // Computer Vision
-            'cv-train', 'cv-inference',
+            'cv-train', 'cv-inference', 'postgresql','twilio','elevenlabs','openai','gemini','ai-agent',
             // Other
             'context-store',
         ].includes(n.type)

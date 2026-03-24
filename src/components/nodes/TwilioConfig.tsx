@@ -36,8 +36,8 @@ const MakeCallForm: React.FC<{ params: Record<string, unknown>; onChange: (p: Re
         <Field label="From Phone Number" hint="Your Twilio number">
             <input type="tel" className={inputClass} placeholder="+1234567890" value={(params.from as string) ?? ''} onChange={(e) => onChange({ ...params, from: e.target.value })} />
         </Field>
-        <Field label="TwiML or URL" hint="TwiML XML or URL to TwiML endpoint">
-            <textarea className={`${inputClass} resize-none h-32`} placeholder="<Response><Say>Hello</Say></Response>" value={(params.twiml as string) ?? ''} onChange={(e) => onChange({ ...params, twiml: e.target.value })} />
+        <Field label="TwiML or URL (Required)" hint="TwiML XML (e.g., <Response><Say>Hello</Say></Response>) or URL to TwiML endpoint">
+            <textarea className={`${inputClass} resize-none h-32`} placeholder="<Response><Say>Hello! This is a test call.</Say></Response>" value={(params.twiml as string) ?? ''} onChange={(e) => onChange({ ...params, twiml: e.target.value })} />
         </Field>
         <Field label="Status Callback URL" hint="Optional webhook for call events">
             <input type="url" className={inputClass} placeholder="https://example.com/callback" value={(params.statusCallback as string) ?? ''} onChange={(e) => onChange({ ...params, statusCallback: e.target.value })} />

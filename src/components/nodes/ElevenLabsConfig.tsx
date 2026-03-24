@@ -85,11 +85,11 @@ const TextToSpeechForm: React.FC<{ params: Record<string, unknown>; onChange: (p
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
             </Field>
-            <Field label="Model ID" hint="Optional. Default: eleven_multilingual_v2">
+            <Field label="Model ID" hint="Optional. Default: eleven_v3">
                 <input
                     type="text"
                     className={inputClass}
-                    placeholder="eleven_multilingual_v2"
+                    placeholder="eleven_v3"
                     value={(params.model_id as string) ?? ''}
                     onChange={(e) => onChange({ ...params, model_id: e.target.value })}
                 />

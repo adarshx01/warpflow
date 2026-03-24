@@ -13,7 +13,11 @@ export type SecretKey =
   | 's3_bucket_name'
   | 's3_region'
   // ElevenLabs
-  | 'elevenlabs_api_key';
+  | 'elevenlabs_api_key'
+  // Twilio
+  | 'twilio_account_sid'
+  | 'twilio_auth_token'
+  | 'twilio_phone_number';
 
 interface SecretResponse {
   exists: boolean;
