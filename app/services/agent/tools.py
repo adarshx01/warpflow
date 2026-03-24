@@ -39,6 +39,17 @@ from app.services.context.router import (
 from app.services.cv_router.router import (
     cv_train_model, cv_load_model, cv_infer, cv_list_models,
 )
+from app.services.twilio.router import (
+    make_call, send_sms, get_call_status, get_message_status,
+)
+from app.services.elevenlabs.router import (
+    text_to_speech, list_voices, get_voice,
+)
+from app.services.postgresql.router import (
+    execute_query, select_rows, insert_row, update_rows, delete_rows,
+)
+from app.services.call_conversation.router import (
+    start_conversation_call as _start_conversation_call_fn,
 from app.services.slack.service import (
     slack_send_message, slack_update_message, slack_delete_message, slack_get_permalink,
     slack_list_channels, slack_get_channel_info, slack_get_channel_history,
@@ -78,6 +89,112 @@ from app.services.aws.s3_service import (
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
+
+# ─────────────────────────────────────────────
+# Wrapper functions for secret-based services (Twilio, ElevenLabs, PostgreSQL)
+# These fetch credentials from UserSecret table and call the underlying functions
+# ─────────────────────────────────────────────
+
+async def _twilio_make_call_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for make_call that fetches Twilio credentials."""
+    from app.services.twilio.router import _get_twilio_credentials
+    from uuid import UUID
+    account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
+    return await make_call(account_sid, auth_token, params)
+
+
+async def _twilio_send_sms_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for send_sms that fetches Twilio credentials."""
+    from app.services.twilio.router import _get_twilio_credentials
+    from uuid import UUID
+    account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
+    return await send_sms(account_sid, auth_token, params)
+
+
+async def _twilio_get_call_status_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for get_call_status that fetches Twilio credentials."""
+    from app.services.twilio.router import _get_twilio_credentials
+    from uuid import UUID
+    account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
+    return await get_call_status(account_sid, auth_token, params)
+
+
+async def _twilio_get_message_status_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for get_message_status that fetches Twilio credentials."""
+    from app.services.twilio.router import _get_twilio_credentials
+    from uuid import UUID
+    account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
+    return await get_message_status(account_sid, auth_token, params)
+
+
+async def _twilio_conversation_call_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for start_conversation_call that is called by the agent."""
+    return await _start_conversation_call_fn(user_id, params, db)
+
+
+async def _elevenlabs_tts_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for text_to_speech that fetches ElevenLabs API key."""
+    from app.services.elevenlabs.router import _get_elevenlabs_api_key
+    from uuid import UUID
+    api_key = await _get_elevenlabs_api_key(db, UUID(user_id))
+    return await text_to_speech(api_key, params)
+
+
+async def _elevenlabs_list_voices_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for list_voices that fetches ElevenLabs API key."""
+    from app.services.elevenlabs.router import _get_elevenlabs_api_key
+    from uuid import UUID
+    api_key = await _get_elevenlabs_api_key(db, UUID(user_id))
+    return await list_voices(api_key, params)
+
+
+async def _elevenlabs_get_voice_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for get_voice that fetches ElevenLabs API key."""
+    from app.services.elevenlabs.router import _get_elevenlabs_api_key
+    from uuid import UUID
+    api_key = await _get_elevenlabs_api_key(db, UUID(user_id))
+    return await get_voice(api_key, params)
+
+
+async def _postgres_query_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for execute_query that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await execute_query(conn_str, params)
+
+
+async def _postgres_select_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for select_rows that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await select_rows(conn_str, params)
+
+
+async def _postgres_insert_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for insert_row that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await insert_row(conn_str, params)
+
+
+async def _postgres_update_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for update_rows that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await update_rows(conn_str, params)
+
+
+async def _postgres_delete_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for delete_rows that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await delete_rows(conn_str, params)
+
 # Tools that don't require OAuth credentials (use user_id instead)
 CREDENTIAL_LESS_TOOLS = {
     "ml-trainer",  # Legacy
@@ -88,6 +205,9 @@ CREDENTIAL_LESS_TOOLS = {
     "context-store",
     "cv-train",
     "cv-inference",
+    "twilio",
+    "elevenlabs",
+    "postgresql",
 }
 
 
@@ -1110,6 +1230,201 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
             "_fn": cv_list_models,
         },
     ],
+    "twilio": [
+        {
+            "name": "twilio_make_call",
+            "description": "Make an outbound phone call using Twilio with TwiML or webhook URL",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient phone number in E.164 format (+1234567890)"},
+                    "from": {"type": "string", "description": "Your Twilio phone number"},
+                    "twiml": {"type": "string", "description": "TwiML XML or URL to TwiML endpoint"},
+                    "statusCallback": {"type": "string", "description": "Optional webhook URL for call status updates"},
+                },
+                "required": ["to", "from", "twiml"],
+            },
+            "_fn": _twilio_make_call_wrapper,
+        },
+        {
+            "name": "twilio_send_sms",
+            "description": "Send an SMS message using Twilio",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient phone number in E.164 format"},
+                    "from": {"type": "string", "description": "Your Twilio phone number"},
+                    "body": {"type": "string", "description": "SMS message body (max 1600 chars)"},
+                },
+                "required": ["to", "from", "body"],
+            },
+            "_fn": _twilio_send_sms_wrapper,
+        },
+        {
+            "name": "twilio_get_call_status",
+            "description": "Get the status of a call by SID",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sid": {"type": "string", "description": "Call SID (starts with CA)"},
+                },
+                "required": ["sid"],
+            },
+            "_fn": _twilio_get_call_status_wrapper,
+        },
+        {
+            "name": "twilio_get_message_status",
+            "description": "Get the status of an SMS message by SID",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sid": {"type": "string", "description": "Message SID (starts with SM)"},
+                },
+                "required": ["sid"],
+            },
+            "_fn": _twilio_get_message_status_wrapper,
+        },
+        {
+            "name": "twilio_make_conversation_call",
+            "description": "Make an outbound phone call with real-time AI voice conversation. The AI agent will have a back-and-forth voice conversation with the person who answers. Uses ElevenLabs Conversational AI for natural speech. The call continues until the user or agent ends it.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient phone number in E.164 format (+1234567890)"},
+                    "from": {"type": "string", "description": "Your Twilio phone number in E.164 format"},
+                    "system_prompt": {"type": "string", "description": "Instructions for the AI voice agent describing its role, personality, and what to discuss during the call"},
+                    "first_message": {"type": "string", "description": "The first thing the AI says when the call is answered (greeting)"},
+                    "voice_id": {"type": "string", "description": "Optional ElevenLabs voice ID for the AI voice"},
+                },
+                "required": ["to", "from", "system_prompt", "first_message"],
+            },
+            "_fn": _twilio_conversation_call_wrapper,
+        },
+    ],
+    "elevenlabs": [
+        {
+            "name": "elevenlabs_text_to_speech",
+            "description": "Convert text to natural-sounding speech using ElevenLabs. Returns base64-encoded audio that can be played or saved.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Text to convert to speech (max 5000 chars)"},
+                    "voice_id": {"type": "string", "description": "Voice ID (use elevenlabs_list_voices to get available voices)"},
+                    "model_id": {"type": "string", "description": "Model ID (default: eleven_v3)"},
+                    "stability": {"type": "number", "description": "Voice stability 0.0-1.0 (default: 0.5)"},
+                    "similarity_boost": {"type": "number", "description": "Similarity boost 0.0-1.0 (default: 0.5)"},
+                },
+                "required": ["text", "voice_id"],
+            },
+            "_fn": _elevenlabs_tts_wrapper,
+        },
+        {
+            "name": "elevenlabs_list_voices",
+            "description": "List all available ElevenLabs voices with their IDs and names",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": _elevenlabs_list_voices_wrapper,
+        },
+        {
+            "name": "elevenlabs_get_voice",
+            "description": "Get details of a specific voice by ID",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "voice_id": {"type": "string", "description": "Voice ID"},
+                },
+                "required": ["voice_id"],
+            },
+            "_fn": _elevenlabs_get_voice_wrapper,
+        },
+        {
+            "name": "twilio_make_conversation_call",
+            "description": "Make an outbound phone call with real-time AI voice conversation. The AI agent will have a back-and-forth voice conversation with the person who answers. Uses ElevenLabs Conversational AI for natural speech. The call continues until the user or agent ends it. Requires both Twilio and ElevenLabs credentials configured.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient phone number in E.164 format (+1234567890)"},
+                    "from": {"type": "string", "description": "Your Twilio phone number in E.164 format"},
+                    "system_prompt": {"type": "string", "description": "Instructions for the AI voice agent describing its role, personality, and what to discuss during the call"},
+                    "first_message": {"type": "string", "description": "The first thing the AI says when the call is answered (greeting)"},
+                    "voice_id": {"type": "string", "description": "Optional ElevenLabs voice ID for the AI voice"},
+                },
+                "required": ["to", "from", "system_prompt", "first_message"],
+            },
+            "_fn": _twilio_conversation_call_wrapper,
+        },
+    ],
+    "postgresql": [
+        {
+            "name": "postgres_query",
+            "description": "Execute a raw SQL query (SELECT, INSERT, UPDATE, DELETE) on PostgreSQL database",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "SQL query to execute"},
+                    "params": {"type": "array", "items": {"type": "string"}, "description": "Query parameters for placeholders ($1, $2, etc)"},
+                },
+                "required": ["query"],
+            },
+            "_fn": _postgres_query_wrapper,
+        },
+        {
+            "name": "postgres_select",
+            "description": "Select rows from a PostgreSQL table with optional WHERE clause and LIMIT",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name"},
+                    "columns": {"type": "string", "description": "Columns to select (comma-separated or * for all)"},
+                    "where": {"type": "string", "description": "Optional WHERE clause (without the WHERE keyword)"},
+                    "limit": {"type": "integer", "description": "Optional max number of rows to return"},
+                },
+                "required": ["table"],
+            },
+            "_fn": _postgres_select_wrapper,
+        },
+        {
+            "name": "postgres_insert",
+            "description": "Insert a new row into a PostgreSQL table",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name"},
+                    "data": {"type": "object", "description": "Row data as object with column names as keys"},
+                },
+                "required": ["table", "data"],
+            },
+            "_fn": _postgres_insert_wrapper,
+        },
+        {
+            "name": "postgres_update",
+            "description": "Update rows in a PostgreSQL table matching WHERE clause",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name"},
+                    "data": {"type": "object", "description": "Data to update as object with column names as keys"},
+                    "where": {"type": "string", "description": "WHERE clause (required for safety)"},
+                },
+                "required": ["table", "data", "where"],
+            },
+            "_fn": _postgres_update_wrapper,
+        },
+        {
+            "name": "postgres_delete",
+            "description": "Delete rows from a PostgreSQL table matching WHERE clause",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name"},
+                    "where": {"type": "string", "description": "WHERE clause (required for safety)"},
+                },
+                "required": ["table", "where"],
+            },
+            "_fn": _postgres_delete_wrapper,
     "slack": [
         {
             "name": "slack_send_message",

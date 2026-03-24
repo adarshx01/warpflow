@@ -33,6 +33,10 @@ dependencies = [
     # File uploads & S3
     "python-multipart>=0.0.20",
     "boto3>=1.35.0",
+    "twilio>=9.10.4",
+    # Call Conversation (WebSocket bridge)
+    "websockets>=12.0",
+    "audioop-lts>=0.2.1",
     # Trigger pollers
     "feedparser>=6.0.12",
 ]

@@ -30,12 +30,17 @@ _ALLOWED_KEYS = {
     "google_oauth_client_secret",
     "agent_openai_api_key",
     "agent_gemini_api_key",
+    "postgresql_connection_string",
     # S3/Storage credentials
     "s3_access_key",
     "s3_secret_key",
     "s3_endpoint_url",
     "s3_bucket_name",
     "s3_region",
+    # ElevenLabs
+    "elevenlabs_api_key",
+    "twilio_account_sid",
+    "twilio_auth_token",
 }
 
 # These keys hold credentials that are only used inside the backend.
@@ -43,8 +48,13 @@ _ALLOWED_KEYS = {
 _BACKEND_ONLY_KEYS = {
     "agent_openai_api_key",
     "agent_gemini_api_key",
+    "postgresql_connection_string",
     "s3_access_key",
     "s3_secret_key",
+    "elevenlabs_api_key",
+    "twilio_account_sid",
+    "twilio_auth_token",
+
 }
 
 

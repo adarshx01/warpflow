@@ -28,9 +28,11 @@ NODE_TEMPLATES = [
     {"id": "telegram",        "name": "Telegram",           "icon": "✈️",  "color": "from-cyan-400 via-blue-400 to-indigo-500",      "category": "Communication",    "description": "Send Telegram messages and manage bots"},
     {"id": "email",           "name": "Email",              "icon": "📧",  "color": "from-red-400 via-pink-400 to-rose-500",         "category": "Communication",    "description": "Send emails via SMTP or API"},
     {"id": "sms",             "name": "SMS",                "icon": "💌",  "color": "from-green-400 via-emerald-400 to-teal-500",    "category": "Communication",    "description": "Send SMS via Twilio or similar"},
+    {"id": "twilio",          "name": "Twilio",             "icon": "📞",  "color": "from-purple-500 via-pink-500 to-fuchsia-600",   "category": "Communication",    "description": "Make phone calls and send SMS using Twilio"},
+    {"id": "elevenlabs",      "name": "ElevenLabs TTS",     "icon": "🔊",  "color": "from-indigo-500 via-purple-500 to-pink-600",    "category": "AI & ML",          "description": "Convert text to natural-sounding speech with ElevenLabs"},
 
     # ── Data & Storage ────────────────────────────
-    {"id": "postgresql",      "name": "PostgreSQL",         "icon": "🐘",  "color": "from-blue-500 via-indigo-500 to-blue-600",      "category": "Data & Storage",   "description": "Query and manage PostgreSQL databases"},
+    {"id": "postgresql",      "name": "PostgreSQL",         "icon": "🐘",  "color": "from-blue-500 via-indigo-500 to-blue-600",      "category": "Data & Storage",   "description": "Query and manage PostgreSQL databases with full SQL support"},
     {"id": "mongodb",         "name": "MongoDB",            "icon": "🍃",  "color": "from-green-500 via-emerald-500 to-teal-600",    "category": "Data & Storage",   "description": "Query and manage MongoDB collections"},
     {"id": "redis",           "name": "Redis",              "icon": "⚡",  "color": "from-red-500 via-orange-500 to-amber-600",      "category": "Data & Storage",   "description": "Read and write Redis keys"},
     {"id": "mysql",           "name": "MySQL",              "icon": "🐬",  "color": "from-blue-400 via-cyan-400 to-teal-500",        "category": "Data & Storage",   "description": "Query and manage MySQL databases"},
