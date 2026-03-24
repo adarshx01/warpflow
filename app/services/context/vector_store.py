@@ -5,26 +5,19 @@ from pathlib import Path
 from uuid import UUID
 
 import chromadb
-from chromadb.config import Settings as ChromaSettings
 
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 
-def _get_chroma_client(user_id: str) -> chromadb.Client:
+def _get_chroma_client(user_id: str) -> chromadb.ClientAPI:
     """Get or create a ChromaDB client for a user."""
     settings = get_settings()
     persist_path = Path(settings.CHROMADB_PATH) / user_id
     persist_path.mkdir(parents=True, exist_ok=True)
 
-    return chromadb.Client(
-        ChromaSettings(
-            chroma_db_impl="duckdb+parquet",
-            persist_directory=str(persist_path),
-            anonymized_telemetry=False,
-        )
-    )
+    return chromadb.PersistentClient(path=str(persist_path))
 
 
 def _get_collection_name(user_id: str, collection_name: str) -> str:
@@ -75,7 +68,6 @@ class VectorStore:
             metadatas=metadatas,
         )
 
-        self._client.persist()
         logger.info(
             "Added %d documents to collection %s",
             len(ids),
@@ -140,7 +132,6 @@ class VectorStore:
 
         if results["ids"]:
             collection.delete(ids=results["ids"])
-            self._client.persist()
             logger.info(
                 "Deleted %d chunks for document %s",
                 len(results["ids"]),
@@ -166,7 +157,6 @@ class VectorStore:
                 results = collection.get(include=[])
                 if results["ids"]:
                     collection.delete(ids=results["ids"])
-                    self._client.persist()
 
             logger.info("Cleared %d chunks from collection %s", count, self._full_collection_name)
             return count

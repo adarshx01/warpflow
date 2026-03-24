@@ -1,63 +1,70 @@
-"""OpenAI embeddings for vector store."""
+"""Local embeddings using sentence-transformers for vector store."""
 
 import logging
-from typing import Any
+from functools import lru_cache
 
-from openai import AsyncOpenAI
+from sentence_transformers import SentenceTransformer
 
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_BATCH_SIZE = 2000  # OpenAI limit
+_model: SentenceTransformer | None = None
 
 
-async def get_embeddings(texts: list[str], api_key: str) -> list[list[float]]:
+def _get_model() -> SentenceTransformer:
+    """Get or initialize the embedding model (singleton)."""
+    global _model
+    if _model is None:
+        settings = get_settings()
+        model_name = settings.LOCAL_EMBEDDING_MODEL
+        logger.info("Loading embedding model: %s", model_name)
+        _model = SentenceTransformer(model_name)
+        logger.info("Embedding model loaded successfully")
+    return _model
+
+
+async def get_embeddings(texts: list[str], api_key: str = None) -> list[list[float]]:
     """
-    Generate embeddings for a list of texts using OpenAI API.
+    Generate embeddings for a list of texts using local model.
 
     Args:
         texts: List of text strings to embed
-        api_key: OpenAI API key
+        api_key: Ignored (kept for API compatibility)
 
     Returns:
         List of embedding vectors
     """
-    settings = get_settings()
-    client = AsyncOpenAI(api_key=api_key)
-
-    all_embeddings = []
-
-    # Process in batches
-    for i in range(0, len(texts), EMBEDDING_BATCH_SIZE):
-        batch = texts[i : i + EMBEDDING_BATCH_SIZE]
-
-        response = await client.embeddings.create(
-            input=batch,
-            model=settings.OPENAI_EMBEDDING_MODEL,
-        )
-
-        batch_embeddings = [item.embedding for item in response.data]
-        all_embeddings.extend(batch_embeddings)
-
-        logger.debug("Generated embeddings for batch %d-%d", i, i + len(batch))
-
-    return all_embeddings
+    model = _get_model()
+    embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+    return embeddings.tolist()
 
 
-async def get_single_embedding(text: str, api_key: str) -> list[float]:
-    """Generate embedding for a single text."""
-    embeddings = await get_embeddings([text], api_key)
-    return embeddings[0]
+async def get_single_embedding(text: str, api_key: str = None, task_type: str = None) -> list[float]:
+    """
+    Generate embedding for a single text.
+
+    Args:
+        text: Text to embed
+        api_key: Ignored (kept for API compatibility)
+        task_type: Ignored (kept for API compatibility)
+
+    Returns:
+        Embedding vector
+    """
+    model = _get_model()
+    embedding = model.encode(text, convert_to_numpy=True, show_progress_bar=False)
+    return embedding.tolist()
 
 
 def get_embedding_dimension() -> int:
     """Return the embedding dimension for the configured model."""
     settings = get_settings()
-    # text-embedding-3-small has 1536 dimensions
+    # Common model dimensions
     dimensions = {
-        "text-embedding-3-small": 1536,
-        "text-embedding-3-large": 3072,
-        "text-embedding-ada-002": 1536,
+        "all-MiniLM-L6-v2": 384,
+        "all-mpnet-base-v2": 768,
+        "paraphrase-MiniLM-L6-v2": 384,
+        "multi-qa-MiniLM-L6-cos-v1": 384,
     }
-    return dimensions.get(settings.OPENAI_EMBEDDING_MODEL, 1536)
+    return dimensions.get(settings.LOCAL_EMBEDDING_MODEL, 384)

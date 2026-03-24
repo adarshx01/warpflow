@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.database import get_db
-from app.models import User, ContextCollection, ContextDocument, UserSecret
+from app.models import User, ContextCollection, ContextDocument
 from app.auth.utils import get_current_user
 from app.services.storage import upload_file, delete_file
 from app.services.storage.s3_storage import decode_base64_content
@@ -31,7 +32,6 @@ from app.services.context.schemas import (
 from app.services.context.embeddings import get_embeddings, get_single_embedding
 from app.services.context.pdf_processor import extract_text, chunk_text, get_chunk_metadata
 from app.services.context.vector_store import VectorStore
-from app.security import decrypt_value
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +89,9 @@ async def delete_collection_endpoint(
     user: User = Depends(get_current_user),
 ):
     """Delete a collection and all its documents."""
-    api_key = await _get_openai_api_key(db, user.id)
     result = await context_clear_collection(
         str(user.id),
-        {"collection_name": collection_name, "openai_api_key": api_key},
+        {"collection_name": collection_name},
         db,
     )
     if "error" in result:
@@ -114,11 +113,9 @@ async def upload_document_endpoint(
     user: User = Depends(get_current_user),
 ):
     """Upload a document to a collection."""
-    api_key = await _get_openai_api_key(db, user.id)
-
     result = await context_upload_document(
         str(user.id),
-        {**request.model_dump(), "openai_api_key": api_key},
+        request.model_dump(),
         db,
     )
     if "error" in result:
@@ -168,11 +165,9 @@ async def query_endpoint(
     user: User = Depends(get_current_user),
 ):
     """Query a collection for relevant documents."""
-    api_key = await _get_openai_api_key(db, user.id)
-
     result = await context_query(
         str(user.id),
-        {**request.model_dump(), "openai_api_key": api_key},
+        request.model_dump(),
         db,
     )
     if "error" in result:
@@ -200,13 +195,7 @@ async def execute_endpoint(
     if not op_fn:
         raise HTTPException(status_code=400, detail=f"Unknown operation: {request.operation}")
 
-    # Add API key if needed
-    params = request.params.copy()
-    if request.operation in ["upload_document", "query", "clear_collection"]:
-        if "openai_api_key" not in params:
-            params["openai_api_key"] = await _get_openai_api_key(db, user.id)
-
-    result = await op_fn(str(user.id), params, db)
+    result = await op_fn(str(user.id), request.params, db)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -227,10 +216,6 @@ async def context_upload_document(user_id: str, params: dict[str, Any], db: Asyn
         file_type = params["file_type"]
         chunk_size = params.get("chunk_size", 500)
         chunk_overlap = params.get("chunk_overlap", 50)
-        api_key = params.get("openai_api_key")
-
-        if not api_key:
-            return {"error": "OpenAI API key required for embeddings"}
 
         # Extract text from document
         text = extract_text(file_content, file_type)
@@ -242,8 +227,8 @@ async def context_upload_document(user_id: str, params: dict[str, Any], db: Asyn
         if not chunks:
             return {"error": "Document produced no chunks"}
 
-        # Generate embeddings
-        embeddings = await get_embeddings(chunks, api_key)
+        # Generate embeddings (local model - no API key needed)
+        embeddings = await get_embeddings(chunks)
 
         # Generate document ID and create metadata
         document_id = str(uuid4())
@@ -257,15 +242,21 @@ async def context_upload_document(user_id: str, params: dict[str, Any], db: Asyn
         vector_store = VectorStore(user_id, collection_name)
         vector_store.add_documents(ids, chunks, embeddings, metadatas)
 
-        # Upload original file to S3 for backup
-        s3_path = upload_file(
-            user_id=UUID(user_id),
-            category="documents",
-            file_id=UUID(document_id),
-            content=file_content,
-            extension=file_type,
-            content_type=_get_content_type(file_type),
-        )
+        # Upload original file to S3 for backup (optional - skip if S3 not configured)
+        s3_path = None
+        settings = get_settings()
+        if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY:
+            try:
+                s3_path = upload_file(
+                    user_id=UUID(user_id),
+                    category="documents",
+                    file_id=UUID(document_id),
+                    content=file_content,
+                    extension=file_type,
+                    content_type=_get_content_type(file_type),
+                )
+            except Exception as e:
+                logger.warning("S3 upload skipped (optional): %s", e)
 
         # Ensure collection exists in database and update counts
         collection = await _get_or_create_collection(db, collection_name, UUID(user_id))
@@ -304,13 +295,9 @@ async def context_query(user_id: str, params: dict[str, Any], db: AsyncSession =
         collection_name = params["collection_name"]
         query_text = params["query_text"]
         top_k = params.get("top_k", 5)
-        api_key = params.get("openai_api_key")
 
-        if not api_key:
-            return {"error": "OpenAI API key required for embeddings"}
-
-        # Generate query embedding
-        query_embedding = await get_single_embedding(query_text, api_key)
+        # Generate query embedding (local model - no API key needed)
+        query_embedding = await get_single_embedding(query_text)
 
         # Query vector store
         vector_store = VectorStore(user_id, collection_name)
@@ -463,29 +450,6 @@ async def _get_or_create_collection(db: AsyncSession, name: str, user_id: UUID) 
         db.add(collection)
         await db.flush()
     return collection
-
-
-async def _get_openai_api_key(db: AsyncSession, user_id: UUID) -> str:
-    """Get OpenAI API key from user secrets."""
-    result = await db.execute(
-        select(UserSecret).where(
-            UserSecret.owner_id == user_id,
-            UserSecret.secret_key == "agent_openai_api_key",
-        )
-    )
-    secret = result.scalar_one_or_none()
-    if not secret:
-        raise HTTPException(
-            status_code=400,
-            detail="OpenAI API key not configured. Please add it in Settings > Secrets.",
-        )
-    api_key = decrypt_value(secret.encrypted_value)
-    if not api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Stored API key is empty. Please reset and re-enter it.",
-        )
-    return api_key
 
 
 def _get_content_type(file_type: str) -> str:

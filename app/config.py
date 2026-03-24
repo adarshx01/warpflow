@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     # ChromaDB
     CHROMADB_PATH: str = "./storage/chromadb"
 
-    # OpenAI Embeddings
-    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    # Local Embeddings (no API needed)
+    LOCAL_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
     # CV Service
     CV_SERVICE_URL: str = "http://localhost:8080"

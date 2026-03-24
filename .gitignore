@@ -14,3 +14,8 @@ app/services/cv/training/saved_models/.*
 app/services/cv/training/saved_models.*
 app/services/cv/training/saved_models/
 app/services/cv/training/saved_models/*
+storage/chromadb/f0fe5924-60bf-4fb0-8798-6ee096907824/chroma.sqlite3
+storage/chromadb/f0fe5924-60bf-4fb0-8798-6ee096907824/f69ae3af-fb37-48bd-8937-bac1a1742a39/data_level0.bin
+storage/chromadb/f0fe5924-60bf-4fb0-8798-6ee096907824/f69ae3af-fb37-48bd-8937-bac1a1742a39/header.bin
+storage/chromadb/f0fe5924-60bf-4fb0-8798-6ee096907824/f69ae3af-fb37-48bd-8937-bac1a1742a39/length.bin
+storage/chromadb/f0fe5924-60bf-4fb0-8798-6ee096907824/f69ae3af-fb37-48bd-8937-bac1a1742a39/link_lists.bin
