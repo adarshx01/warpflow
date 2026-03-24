@@ -17,6 +17,16 @@ import ModelInferenceConfig from './nodes/ModelInferenceConfig';
 // Computer Vision nodes
 import CVTrainConfig from './nodes/CVTrainConfig';
 import CVInferenceConfig from './nodes/CVInferenceConfig';
+// Trigger nodes
+import ManualTriggerConfig from './nodes/ManualTriggerConfig';
+import ScheduleConfig from './nodes/ScheduleConfig';
+import WebhookConfig from './nodes/WebhookConfig';
+import EmailTriggerConfig from './nodes/EmailTriggerConfig';
+import NewsTriggerConfig from './nodes/NewsTriggerConfig';
+// Communication nodes
+import SlackConfig from './nodes/SlackConfig';
+import TelegramConfig from './nodes/TelegramConfig';
+import S3Config from './nodes/S3Config';
 
 interface Node {
     id: string;
@@ -72,6 +82,25 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <CVTrainConfig initialData={node.data} onSave={handleSave} />;
             case 'cv-inference':
                 return <CVInferenceConfig initialData={node.data} onSave={handleSave} />;
+            // Trigger nodes
+            case 'manual-trigger':
+                return <ManualTriggerConfig initialData={node.data} onSave={handleSave} />;
+            case 'schedule':
+                return <ScheduleConfig initialData={node.data} onSave={handleSave} />;
+            case 'webhook':
+                return <WebhookConfig initialData={node.data} onSave={handleSave} nodeId={node.id} />;
+            case 'email-trigger':
+                return <EmailTriggerConfig initialData={node.data} onSave={handleSave} />;
+            case 'news-trigger':
+                return <NewsTriggerConfig initialData={node.data} onSave={handleSave} />;
+            // Communication nodes
+            case 'slack':
+                return <SlackConfig initialData={node.data} onSave={handleSave} />;
+            case 'telegram':
+                return <TelegramConfig initialData={node.data} onSave={handleSave} />;
+            case 's3':
+            case 'aws':
+                return <S3Config initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">

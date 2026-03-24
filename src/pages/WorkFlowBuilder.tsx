@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Play, Trash2, ZoomIn, ZoomOut, Maximize2, Save, Download, Search, ChevronDown, Grid, Settings, Copy, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Plus, Play, Trash2, ZoomIn, ZoomOut, Maximize2, Save, Download, Search, ChevronDown, Grid, Settings, Copy, LogOut, PanelLeftClose, PanelLeftOpen, Power, Loader2 } from 'lucide-react';
+import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import NodeConfigModal from '../components/NodeConfigModal';
@@ -35,6 +36,7 @@ const nodeTypes: NodeType[] = [
   { id: 'schedule', name: 'Schedule', icon: '⏰', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Triggers' },
   { id: 'webhook', name: 'Webhook', icon: '🔗', color: 'from-cyan-400 via-teal-400 to-green-500', category: 'Triggers' },
   { id: 'email-trigger', name: 'Email Trigger', icon: '📨', color: 'from-pink-400 via-rose-400 to-red-500', category: 'Triggers' },
+  { id: 'news-trigger', name: 'News Trigger', icon: '📰', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Triggers' },
 
   // AI & ML
   { id: 'openai', name: 'OpenAI (ChatGPT)', icon: '🧠', color: 'from-emerald-400 via-teal-400 to-cyan-500', category: 'AI & ML' },
@@ -124,6 +126,10 @@ const WorkflowBuilder = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [configNode, setConfigNode] = useState<Node | null>(null);
   const [showExecuteModal, setShowExecuteModal] = useState(false);
+  const [workflowId, setWorkflowId] = useState<string | null>(null);
+  const [isActive, setIsActive] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const { user, logout } = useAuth();
@@ -348,6 +354,62 @@ const WorkflowBuilder = () => {
     setShowExecuteModal(true);
   };
 
+  // Detect which background trigger nodes are present
+  const hasTriggerNode = nodes.some(n =>
+    ['news-trigger', 'email-trigger', 'schedule', 'webhook'].includes(n.type)
+  );
+
+  const saveWorkflow = async () => {
+    if (nodes.length === 0) return;
+    setIsSaving(true);
+    setSaveStatus(null);
+    try {
+      const payload = { nodes, connections };
+      if (workflowId) {
+        await api(`/api/workflows/${workflowId}`, {
+          method: 'PUT',
+          body: payload,
+        });
+      } else {
+        const created = await api<{ id: string; is_active: boolean }>('/api/workflows', {
+          method: 'POST',
+          body: { name: 'My Workflow', ...payload },
+        });
+        setWorkflowId(created.id);
+        setIsActive(created.is_active ?? false);
+      }
+      setSaveStatus('Saved!');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch {
+      setSaveStatus('Save failed');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleActive = async () => {
+    if (!workflowId) {
+      setSaveStatus('Save your workflow first!');
+      setTimeout(() => setSaveStatus(null), 2500);
+      return;
+    }
+    const next = !isActive;
+    setIsSaving(true);
+    try {
+      await api(`/api/workflows/${workflowId}`, {
+        method: 'PUT',
+        body: { is_active: next },
+      });
+      setIsActive(next);
+      setSaveStatus(next ? '✅ Workflow activated — running in background' : '⏹ Workflow stopped');
+      setTimeout(() => setSaveStatus(null), 3000);
+    } catch {
+      setSaveStatus('Failed to update status');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="h-screen w-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden flex flex-col">
       {/* Header */}
@@ -381,10 +443,31 @@ const WorkflowBuilder = () => {
                 </div>
               </button>
 
-              <button className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 rounded-xl font-medium flex items-center gap-2 transition-all border border-slate-700/50 hover:border-slate-600 shadow-lg">
-                <Save className="w-4 h-4" />
-                Save
+              <button
+                onClick={saveWorkflow}
+                disabled={isSaving || nodes.length === 0}
+                className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 disabled:opacity-40 text-slate-200 rounded-xl font-medium flex items-center gap-2 transition-all border border-slate-700/50 hover:border-slate-600 shadow-lg"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {saveStatus ?? 'Save'}
               </button>
+
+              {/* Activate / Stop toggle — only when a background trigger is present */}
+              {hasTriggerNode && (
+                <button
+                  onClick={toggleActive}
+                  disabled={isSaving}
+                  className={`px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg border disabled:opacity-40 ${
+                    isActive
+                      ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-300'
+                      : 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/50 text-emerald-300'
+                  }`}
+                >
+                  <Power className="w-4 h-4" />
+                  {isActive ? 'Stop' : 'Activate'}
+                  {isActive && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
+                </button>
+              )}
 
               <button className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 rounded-xl font-medium flex items-center gap-2 transition-all border border-slate-700/50 hover:border-slate-600 shadow-lg">
                 <Download className="w-4 h-4" />
