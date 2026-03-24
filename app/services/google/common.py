@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models import Credential
 from app.security import decrypt_value, encrypt_value
 
@@ -19,6 +20,17 @@ logger = logging.getLogger(__name__)
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+
+
+def _get_google_credentials() -> tuple[str, str]:
+    """Get Google OAuth credentials from environment."""
+    settings = get_settings()
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google OAuth credentials not configured in environment",
+        )
+    return settings.GOOGLE_CLIENT_ID, settings.GOOGLE_CLIENT_SECRET
 
 
 async def get_user_credential(
@@ -57,8 +69,7 @@ async def get_valid_access_token(credential: Credential, db: AsyncSession) -> st
             detail="Google account not connected. Please complete OAuth flow.",
         )
 
-    client_id = decrypt_value(credential.client_id)
-    client_secret = decrypt_value(credential.client_secret)
+    client_id, client_secret = _get_google_credentials()
 
     async with httpx.AsyncClient() as client:
         try:
@@ -110,7 +121,7 @@ async def google_oauth_start(
     """Build Google OAuth consent screen URL."""
     from urllib.parse import urlencode
 
-    client_id = decrypt_value(credential.client_id)
+    client_id, _ = _get_google_credentials()
 
     params = {
         "client_id": client_id,
@@ -143,8 +154,7 @@ async def google_oauth_callback(
     if not cred:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential not found")
 
-    client_id = decrypt_value(cred.client_id)
-    client_secret = decrypt_value(cred.client_secret)
+    client_id, client_secret = _get_google_credentials()
 
     async with httpx.AsyncClient() as client:
         try:

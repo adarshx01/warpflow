@@ -48,9 +48,13 @@ class Settings(BaseSettings):
     # Public URL for webhook callbacks (Twilio, etc.) — set to your ngrok URL
     PUBLIC_BASE_URL: str = "http://localhost:8000"
 
+    # ElevenLabs
+    elevenlabs_api_key: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 @lru_cache()

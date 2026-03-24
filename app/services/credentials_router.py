@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.database import get_db
 from app.models import User, Credential, UserSecret
 from app.auth.utils import get_current_user
@@ -54,38 +55,29 @@ async def create_credential(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Store a new credential (client_id + client_secret) for the authenticated user."""
+    """Store a new credential for the authenticated user."""
+    # For Google services, use env credentials
+    if body.type.startswith("google-"):
+        settings = get_settings()
+        if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Google OAuth credentials not configured in environment",
+            )
+        client_id = settings.GOOGLE_CLIENT_ID
+        client_secret = settings.GOOGLE_CLIENT_SECRET
+    else:
+        client_id = body.client_id
+        client_secret = body.client_secret
+
     cred = Credential(
         owner_id=current_user.id,
         type=body.type,
         name=body.name,
-        client_id=encrypt_value(body.client_id),
-        client_secret=encrypt_value(body.client_secret),
+        client_id=encrypt_value(client_id),
+        client_secret=encrypt_value(client_secret),
     )
     db.add(cred)
-
-    # Save Google OAuth app details once and reuse as defaults across Google nodes.
-    if body.type.startswith("google-"):
-        for key, plain_value in (
-            ("google_oauth_client_id", body.client_id),
-            ("google_oauth_client_secret", body.client_secret),
-        ):
-            stmt = select(UserSecret).where(
-                UserSecret.owner_id == current_user.id,
-                UserSecret.secret_key == key,
-            )
-            existing = (await db.execute(stmt)).scalar_one_or_none()
-            encrypted = encrypt_value(plain_value)
-            if existing:
-                existing.encrypted_value = encrypted
-            else:
-                db.add(
-                    UserSecret(
-                        owner_id=current_user.id,
-                        secret_key=key,
-                        encrypted_value=encrypted,
-                    )
-                )
 
     await db.commit()
     await db.refresh(cred)
