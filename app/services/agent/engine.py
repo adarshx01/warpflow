@@ -42,6 +42,18 @@ For CV (Computer Vision) tasks:
 4. If custom_model_name is configured, use it when saving the model
 5. For image inference: Use the configured image_url or image_path directly
 
+For Twilio (phone calls and SMS):
+1. Use twilio_make_call to initiate outbound phone calls - requires 'to', 'from', and 'twiml' parameters
+2. The 'twiml' parameter can be XML like '<Response><Say>Hello!</Say></Response>' or a URL to a TwiML endpoint
+3. Use twilio_send_sms to send text messages - requires 'to', 'from', and 'body' parameters
+4. Phone numbers must be in E.164 format (e.g., +1234567890)
+5. Use twilio_get_call_status or twilio_get_message_status to check delivery status
+
+For ElevenLabs (text-to-speech):
+1. Use elevenlabs_list_voices first to get available voice IDs
+2. Use elevenlabs_text_to_speech to convert text to speech audio
+3. The audio is returned as base64-encoded data that can be played or saved
+
 For all tasks:
 - Use pre-configured values from node configurations when available
 - Think step by step about what actions are needed
@@ -304,16 +316,37 @@ class WorkflowEngine:
         """Register tools from connected service nodes, resolving credentials."""
         registered_types: set[str] = set()
 
+        print(f"[DEBUG] Registering tools for {len(service_nodes)} service nodes")
+        print(f"[DEBUG] Service nodes: {[n.get('type') for n in service_nodes]}")
+        print(f"[DEBUG] TOOL_REGISTRY keys: {list(TOOL_REGISTRY.keys())}")
+        print(f"[DEBUG] CREDENTIAL_LESS_TOOLS: {CREDENTIAL_LESS_TOOLS}")
+        logger.info("Registering tools for %d service nodes", len(service_nodes))
+        logger.info("Available TOOL_REGISTRY keys: %s", list(TOOL_REGISTRY.keys()))
+        logger.info("CREDENTIAL_LESS_TOOLS: %s", CREDENTIAL_LESS_TOOLS)
+
         for node in service_nodes:
             node_type = node.get("type", "")
-            if node_type in registered_types or node_type not in TOOL_REGISTRY:
+            print(f"[DEBUG] Processing node type: '{node_type}'")
+            logger.info("Processing node type: '%s'", node_type)
+
+            if node_type in registered_types:
+                print(f"[DEBUG] Skipping '{node_type}' - already registered")
+                logger.info("Skipping '%s' - already registered", node_type)
                 continue
 
-            # Handle credential-less tools (ML, Context Store)
+            if node_type not in TOOL_REGISTRY:
+                print(f"[DEBUG] Node type '{node_type}' NOT in TOOL_REGISTRY")
+                logger.warning("Node type '%s' not found in TOOL_REGISTRY", node_type)
+                continue
+
+            # Handle credential-less tools (ML, Context Store, Twilio, ElevenLabs, etc.)
             if node_type in CREDENTIAL_LESS_TOOLS:
+                print(f"[DEBUG] '{node_type}' is in CREDENTIAL_LESS_TOOLS")
                 for tool_def in TOOL_REGISTRY[node_type]:
                     # Pass user_id instead of OAuth token, and db session
                     self._tool_map[tool_def["name"]] = (tool_def["_fn"], str(self.user.id))
+                    print(f"[DEBUG] Registered tool: {tool_def['name']}")
+                    logger.info("Registered tool: %s", tool_def["name"])
                 registered_types.add(node_type)
                 continue
 
@@ -345,6 +378,8 @@ class WorkflowEngine:
         """Return tool definitions for only the registered (available) tools."""
         defs = []
         seen: set[str] = set()
+        print(f"[DEBUG] Building tool definitions. tool_map keys: {list(self._tool_map.keys())}")
+        logger.info("Building tool definitions. tool_map contains: %s", list(self._tool_map.keys()))
         for service_tools in TOOL_REGISTRY.values():
             for tool in service_tools:
                 name = tool["name"]
@@ -355,6 +390,8 @@ class WorkflowEngine:
                         "parameters": tool["parameters"],
                     })
                     seen.add(name)
+        print(f"[DEBUG] Final tool definitions: {[d['name'] for d in defs]}")
+        logger.info("Final tool definitions count: %d, tools: %s", len(defs), [d["name"] for d in defs])
         return defs
 
     async def _execute_tool(self, tool_name: str, args: dict) -> dict:
@@ -366,12 +403,15 @@ class WorkflowEngine:
 
         fn, token = self._tool_map[tool_name]
         try:
-            # Credential-less tools (ML, Context, CV) need db session or just user_id
+            # Credential-less tools (ML, Context, CV, Twilio, ElevenLabs, PostgreSQL) need db session
             if tool_name.startswith("ml_") or tool_name.startswith("context_"):
                 result = await fn(token, args, self.db)
             elif tool_name.startswith("cv_"):
                 # CV tools take (user_id, params) - no db session needed
                 result = await fn(token, args)
+            elif tool_name.startswith("twilio_") or tool_name.startswith("elevenlabs_") or tool_name.startswith("postgres_"):
+                # Secret-based tools need db session to fetch credentials
+                result = await fn(token, args, self.db)
             else:
                 result = await fn(token, args)
             self._steps.append({"tool": tool_name, "params": args, "result": result})
@@ -391,6 +431,9 @@ class WorkflowEngine:
         """Run the agent loop using Gemini function calling."""
         tool_defs = self._get_tool_definitions()
 
+        print(f"[DEBUG] Sending {len(tool_defs)} tools to Gemini: {[t['name'] for t in tool_defs]}")
+        logger.info("Sending %d tools to Gemini: %s", len(tool_defs), [t["name"] for t in tool_defs])
+
         gemini_tools = [{
             "functionDeclarations": [
                 {
@@ -401,6 +444,10 @@ class WorkflowEngine:
                 for t in tool_defs
             ]
         }]
+
+        if not tool_defs:
+            print("[DEBUG] WARNING: No tools available for Gemini!")
+            return "Error: No tools are available. Please ensure service nodes are properly connected to the AI Agent."
 
         contents: list[dict[str, Any]] = [
             {"role": "user", "parts": [{"text": prompt}]},

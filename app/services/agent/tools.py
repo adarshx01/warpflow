@@ -51,6 +51,107 @@ from app.services.postgresql.router import (
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
+
+# ─────────────────────────────────────────────
+# Wrapper functions for secret-based services (Twilio, ElevenLabs, PostgreSQL)
+# These fetch credentials from UserSecret table and call the underlying functions
+# ─────────────────────────────────────────────
+
+async def _twilio_make_call_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for make_call that fetches Twilio credentials."""
+    from app.services.twilio.router import _get_twilio_credentials
+    from uuid import UUID
+    account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
+    return await make_call(account_sid, auth_token, params)
+
+
+async def _twilio_send_sms_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for send_sms that fetches Twilio credentials."""
+    from app.services.twilio.router import _get_twilio_credentials
+    from uuid import UUID
+    account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
+    return await send_sms(account_sid, auth_token, params)
+
+
+async def _twilio_get_call_status_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for get_call_status that fetches Twilio credentials."""
+    from app.services.twilio.router import _get_twilio_credentials
+    from uuid import UUID
+    account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
+    return await get_call_status(account_sid, auth_token, params)
+
+
+async def _twilio_get_message_status_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for get_message_status that fetches Twilio credentials."""
+    from app.services.twilio.router import _get_twilio_credentials
+    from uuid import UUID
+    account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
+    return await get_message_status(account_sid, auth_token, params)
+
+
+async def _elevenlabs_tts_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for text_to_speech that fetches ElevenLabs API key."""
+    from app.services.elevenlabs.router import _get_elevenlabs_api_key
+    from uuid import UUID
+    api_key = await _get_elevenlabs_api_key(db, UUID(user_id))
+    return await text_to_speech(api_key, params)
+
+
+async def _elevenlabs_list_voices_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for list_voices that fetches ElevenLabs API key."""
+    from app.services.elevenlabs.router import _get_elevenlabs_api_key
+    from uuid import UUID
+    api_key = await _get_elevenlabs_api_key(db, UUID(user_id))
+    return await list_voices(api_key, params)
+
+
+async def _elevenlabs_get_voice_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for get_voice that fetches ElevenLabs API key."""
+    from app.services.elevenlabs.router import _get_elevenlabs_api_key
+    from uuid import UUID
+    api_key = await _get_elevenlabs_api_key(db, UUID(user_id))
+    return await get_voice(api_key, params)
+
+
+async def _postgres_query_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for execute_query that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await execute_query(conn_str, params)
+
+
+async def _postgres_select_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for select_rows that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await select_rows(conn_str, params)
+
+
+async def _postgres_insert_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for insert_row that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await insert_row(conn_str, params)
+
+
+async def _postgres_update_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for update_rows that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await update_rows(conn_str, params)
+
+
+async def _postgres_delete_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for delete_rows that fetches PostgreSQL connection string."""
+    from app.services.postgresql.router import _get_connection_string
+    from uuid import UUID
+    conn_str = await _get_connection_string(db, UUID(user_id))
+    return await delete_rows(conn_str, params)
+
 # Tools that don't require OAuth credentials (use user_id instead)
 CREDENTIAL_LESS_TOOLS = {
     "ml-trainer",  # Legacy
@@ -1100,7 +1201,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["to", "from", "twiml"],
             },
-            "_fn": make_call,
+            "_fn": _twilio_make_call_wrapper,
         },
         {
             "name": "twilio_send_sms",
@@ -1114,7 +1215,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["to", "from", "body"],
             },
-            "_fn": send_sms,
+            "_fn": _twilio_send_sms_wrapper,
         },
         {
             "name": "twilio_get_call_status",
@@ -1126,7 +1227,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["sid"],
             },
-            "_fn": get_call_status,
+            "_fn": _twilio_get_call_status_wrapper,
         },
         {
             "name": "twilio_get_message_status",
@@ -1138,7 +1239,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["sid"],
             },
-            "_fn": get_message_status,
+            "_fn": _twilio_get_message_status_wrapper,
         },
     ],
     "elevenlabs": [
@@ -1150,13 +1251,13 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "properties": {
                     "text": {"type": "string", "description": "Text to convert to speech (max 5000 chars)"},
                     "voice_id": {"type": "string", "description": "Voice ID (use elevenlabs_list_voices to get available voices)"},
-                    "model_id": {"type": "string", "description": "Model ID (default: eleven_multilingual_v2)"},
+                    "model_id": {"type": "string", "description": "Model ID (default: eleven_v3)"},
                     "stability": {"type": "number", "description": "Voice stability 0.0-1.0 (default: 0.5)"},
                     "similarity_boost": {"type": "number", "description": "Similarity boost 0.0-1.0 (default: 0.5)"},
                 },
                 "required": ["text", "voice_id"],
             },
-            "_fn": text_to_speech,
+            "_fn": _elevenlabs_tts_wrapper,
         },
         {
             "name": "elevenlabs_list_voices",
@@ -1166,7 +1267,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "properties": {},
                 "required": [],
             },
-            "_fn": list_voices,
+            "_fn": _elevenlabs_list_voices_wrapper,
         },
         {
             "name": "elevenlabs_get_voice",
@@ -1178,7 +1279,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["voice_id"],
             },
-            "_fn": get_voice,
+            "_fn": _elevenlabs_get_voice_wrapper,
         },
     ],
     "postgresql": [
@@ -1193,7 +1294,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["query"],
             },
-            "_fn": execute_query,
+            "_fn": _postgres_query_wrapper,
         },
         {
             "name": "postgres_select",
@@ -1208,7 +1309,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["table"],
             },
-            "_fn": select_rows,
+            "_fn": _postgres_select_wrapper,
         },
         {
             "name": "postgres_insert",
@@ -1221,7 +1322,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["table", "data"],
             },
-            "_fn": insert_row,
+            "_fn": _postgres_insert_wrapper,
         },
         {
             "name": "postgres_update",
@@ -1235,7 +1336,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["table", "data", "where"],
             },
-            "_fn": update_rows,
+            "_fn": _postgres_update_wrapper,
         },
         {
             "name": "postgres_delete",
@@ -1248,7 +1349,7 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 },
                 "required": ["table", "where"],
             },
-            "_fn": delete_rows,
+            "_fn": _postgres_delete_wrapper,
         },
     ],
 }
