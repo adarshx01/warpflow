@@ -5,12 +5,15 @@ export type SecretKey =
   | 'google_oauth_client_secret'
   | 'agent_openai_api_key'
   | 'agent_gemini_api_key'
+  | 'postgresql_connection_string'
   // S3/Storage credentials
   | 's3_access_key'
   | 's3_secret_key'
   | 's3_endpoint_url'
   | 's3_bucket_name'
-  | 's3_region';
+  | 's3_region'
+  // ElevenLabs
+  | 'elevenlabs_api_key';
 
 interface SecretResponse {
   exists: boolean;

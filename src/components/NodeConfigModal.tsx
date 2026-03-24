@@ -17,6 +17,10 @@ import ModelInferenceConfig from './nodes/ModelInferenceConfig';
 // Computer Vision nodes
 import CVTrainConfig from './nodes/CVTrainConfig';
 import CVInferenceConfig from './nodes/CVInferenceConfig';
+// Communication & Database nodes
+import TwilioConfig from './nodes/TwilioConfig';
+import ElevenLabsConfig from './nodes/ElevenLabsConfig';
+import PostgreSQLConfig from './nodes/PostgreSQLConfig';
 
 interface Node {
     id: string;
@@ -72,6 +76,13 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <CVTrainConfig initialData={node.data} onSave={handleSave} />;
             case 'cv-inference':
                 return <CVInferenceConfig initialData={node.data} onSave={handleSave} />;
+            // Communication & Database nodes
+            case 'twilio':
+                return <TwilioConfig initialData={node.data} onSave={handleSave} />;
+            case 'elevenlabs':
+                return <ElevenLabsConfig initialData={node.data} onSave={handleSave} />;
+            case 'postgresql':
+                return <PostgreSQLConfig initialData={node.data} onSave={handleSave} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
