@@ -50,6 +50,7 @@ from app.services.postgresql.router import (
 )
 from app.services.call_conversation.router import (
     start_conversation_call as _start_conversation_call_fn,
+)
 from app.services.slack.service import (
     slack_send_message, slack_update_message, slack_delete_message, slack_get_permalink,
     slack_list_channels, slack_get_channel_info, slack_get_channel_history,
@@ -1425,6 +1426,8 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "required": ["table", "where"],
             },
             "_fn": _postgres_delete_wrapper,
+        }
+    ],
     "slack": [
         {
             "name": "slack_send_message",
