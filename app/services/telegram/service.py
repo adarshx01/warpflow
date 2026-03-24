@@ -19,6 +19,14 @@ async def _call(token: str, method: str, payload: dict) -> dict:
     body = {k: v for k, v in payload.items() if v is not None}
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(url, json=body)
+        if resp.status_code >= 400:
+            try:
+                err_data = resp.json()
+                desc = err_data.get("description", resp.text)
+            except Exception:
+                desc = resp.text
+            raise RuntimeError(f"Telegram API error ({method}): {desc}")
+            
         resp.raise_for_status()
         data = resp.json()
         if not data.get("ok"):
