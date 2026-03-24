@@ -48,6 +48,7 @@ const nodeTypes: NodeType[] = [
   { id: 'context-store', name: 'Context Store', icon: '📚', color: 'from-amber-400 via-orange-400 to-red-500', category: 'AI & ML' },
   { id: 'text-analysis', name: 'Text Analysis', icon: '📝', color: 'from-blue-400 via-cyan-400 to-teal-500', category: 'AI & ML' },
   { id: 'image-gen', name: 'Image Generation', icon: '🎨', color: 'from-pink-400 via-purple-400 to-indigo-500', category: 'AI & ML' },
+  { id: 'elevenlabs', name: 'ElevenLabs TTS', icon: '🔊', color: 'from-indigo-500 via-purple-500 to-pink-600', category: 'AI & ML' },
 
   // ML Training & Inference
   { id: 'data-prep', name: 'Data Preparation', icon: '📊', color: 'from-blue-400 via-cyan-400 to-emerald-500', category: 'ML Training' },
@@ -66,6 +67,7 @@ const nodeTypes: NodeType[] = [
   { id: 'telegram', name: 'Telegram', icon: '✈️', color: 'from-cyan-400 via-blue-400 to-indigo-500', category: 'Communication' },
   { id: 'email', name: 'Email', icon: '📧', color: 'from-red-400 via-pink-400 to-rose-500', category: 'Communication' },
   { id: 'sms', name: 'SMS', icon: '💌', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'Communication' },
+  { id: 'twilio', name: 'Twilio', icon: '📞', color: 'from-purple-500 via-pink-500 to-fuchsia-600', category: 'Communication' },
 
   // Data & Storage
   { id: 'postgresql', name: 'PostgreSQL', icon: '🐘', color: 'from-blue-500 via-indigo-500 to-blue-600', category: 'Data & Storage' },
