@@ -16,6 +16,7 @@ import uuid
 from typing import Any, Dict, Optional
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -47,6 +48,69 @@ router = APIRouter(prefix="/api/call-conversation", tags=["call-conversation"])
 _sessions: Dict[str, Dict[str, Any]] = {}
 
 ELEVENLABS_CONVAI_WS = "wss://api.elevenlabs.io/v1/convai/conversation"
+ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1"
+
+
+async def _create_elevenlabs_agent(
+    api_key: str,
+    system_prompt: str,
+    first_message: str,
+    voice_id: Optional[str] = None,
+) -> str:
+    """Create a temporary ElevenLabs Conversational AI agent via REST API.
+
+    Returns the agent_id needed for the WebSocket connection.
+    """
+    agent_config = {
+        "conversation_config": {
+            "agent": {
+                "prompt": {
+                    "prompt": system_prompt,
+                },
+                "first_message": first_message,
+                "language": "en",
+            },
+            "tts": {
+                "model_id": "eleven_turbo_v2",
+            },
+        },
+        "name": f"warp-call-agent-{uuid.uuid4().hex[:8]}",
+    }
+
+    if voice_id:
+        agent_config["conversation_config"]["tts"]["voice_id"] = voice_id
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{ELEVENLABS_API_BASE}/convai/agents/create",
+            json=agent_config,
+            headers={"xi-api-key": api_key},
+        )
+
+        if resp.status_code != 200:
+            logger.error("Failed to create ElevenLabs agent: %s %s", resp.status_code, resp.text)
+            raise RuntimeError(f"ElevenLabs agent creation failed ({resp.status_code}): {resp.text}")
+
+        data = resp.json()
+        agent_id = data.get("agent_id")
+        if not agent_id:
+            raise RuntimeError(f"ElevenLabs agent creation returned no agent_id: {data}")
+
+        logger.info("Created ElevenLabs agent: %s", agent_id)
+        return agent_id
+
+
+async def _delete_elevenlabs_agent(api_key: str, agent_id: str):
+    """Delete a temporary ElevenLabs agent after the call ends."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.delete(
+                f"{ELEVENLABS_API_BASE}/convai/agents/{agent_id}",
+                headers={"xi-api-key": api_key},
+            )
+            logger.info("Deleted ElevenLabs agent %s: status=%s", agent_id, resp.status_code)
+    except Exception as e:
+        logger.warning("Failed to delete ElevenLabs agent %s: %s", agent_id, e)
 
 
 class StartConversationRequest(BaseModel):
@@ -262,8 +326,8 @@ async def get_session_status(
 async def websocket_bridge(websocket: WebSocket, session_id: str):
     """Bidirectional WebSocket bridge between Twilio and ElevenLabs.
 
-    Twilio sends mulaw 8kHz audio → we convert to PCM 16kHz → send to ElevenLabs.
-    ElevenLabs sends back PCM audio → we convert to mulaw 8kHz → send to Twilio.
+    Twilio sends mulaw 8kHz audio → we send to ElevenLabs (ulaw_8000 output).
+    ElevenLabs sends back audio → we forward to Twilio.
     """
     await websocket.accept()
 
@@ -278,6 +342,7 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
 
     stream_sid = None
     elevenlabs_ws = None
+    agent_id = None
 
     try:
         # Wait for Twilio's 'connected' and 'start' events
@@ -299,58 +364,61 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
                 logger.info("Twilio stream stopped before start: session=%s", session_id)
                 return
 
-        # ─── Connect to ElevenLabs Conversational AI ───
+        # ─── Get signed URL from ElevenLabs ───
         elevenlabs_key = session["elevenlabs_key"]
         system_prompt = session["system_prompt"]
         first_message = session["first_message"]
 
-        # Build ElevenLabs WebSocket URL with signed URL approach
-        # We use the API key directly in headers for server-side connections
-        el_headers = {
-            "xi-api-key": elevenlabs_key,
-        }
+        try:
+            agent_id = await _create_elevenlabs_agent(
+                api_key=elevenlabs_key,
+                system_prompt=system_prompt,
+                first_message=first_message,
+                voice_id=session.get("voice_id"),
+            )
+            session["elevenlabs_agent_id"] = agent_id
+            logger.info("Created ElevenLabs agent for session %s: agent_id=%s", session_id, agent_id)
+        except Exception as e:
+            logger.error("Failed to create ElevenLabs agent: %s", e)
+            session["status"] = "error"
+            session["error"] = f"ElevenLabs agent creation failed: {str(e)}"
+            await websocket.close(code=4500, reason="ElevenLabs agent creation failed")
+            return
 
-        # Build conversation config to send after connection
-        conversation_config = {
-            "type": "conversation_initiation_client_data",
-            "conversation_config_override": {
-                "agent": {
-                    "prompt": {
-                        "prompt": system_prompt,
-                    },
-                    "first_message": first_message,
-                },
-                "tts": {
-                    "output_format": "ulaw_8000",
-                },
-            },
-        }
+        # Get a signed URL for the WebSocket connection (avoids sending API key in headers)
+        try:
+            async with httpx.AsyncClient(timeout=15) as http_client:
+                resp = await http_client.get(
+                    f"{ELEVENLABS_API_BASE}/convai/conversation/get_signed_url?agent_id={agent_id}",
+                    headers={"xi-api-key": elevenlabs_key},
+                )
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Failed to get signed URL: {resp.status_code} {resp.text}")
+                signed_url = resp.json().get("signed_url")
+                if not signed_url:
+                    raise RuntimeError(f"No signed_url in response: {resp.json()}")
+                logger.info("Got ElevenLabs signed URL for session: %s", session_id)
+        except Exception as e:
+            logger.error("Failed to get ElevenLabs signed URL: %s", e)
+            session["status"] = "error"
+            session["error"] = f"ElevenLabs signed URL failed: {str(e)}"
+            await websocket.close(code=4500, reason="ElevenLabs signed URL failed")
+            return
 
-        # Add optional voice config
-        if session.get("voice_id"):
-            conversation_config["conversation_config_override"]["tts"]["voice_id"] = session["voice_id"]
-
-        # Connect to ElevenLabs - use agent_id if provided, otherwise create a default agent
-        el_url = f"{ELEVENLABS_CONVAI_WS}?agent_id=default"
-
+        # ─── Connect to ElevenLabs Conversational AI WebSocket ───
         try:
             elevenlabs_ws = await websockets.connect(
-                el_url,
-                additional_headers=el_headers,
+                signed_url,
                 ping_interval=20,
                 ping_timeout=10,
             )
             logger.info("ElevenLabs WebSocket connected for session: %s", session_id)
         except Exception as e:
-            logger.error("Failed to connect to ElevenLabs: %s", e)
+            logger.error("Failed to connect to ElevenLabs WS: %s", e)
             session["status"] = "error"
-            session["error"] = f"ElevenLabs connection failed: {str(e)}"
+            session["error"] = f"ElevenLabs WS connection failed: {str(e)}"
             await websocket.close(code=4500, reason="ElevenLabs connection failed")
             return
-
-        # Send conversation config
-        await elevenlabs_ws.send(json.dumps(conversation_config))
-        logger.info("Sent conversation config to ElevenLabs for session: %s", session_id)
 
         session["status"] = "in_call"
 
@@ -366,22 +434,23 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
 
                     if event == "media":
                         payload = data.get("media", {}).get("payload", "")
-                        if payload and elevenlabs_ws and elevenlabs_ws.open:
-                            # Decode mulaw from Twilio
-                            mulaw_bytes = base64.b64decode(payload)
-
-                            # Send as base64-encoded audio to ElevenLabs
-                            audio_message = {
-                                "user_audio_chunk": base64.b64encode(mulaw_bytes).decode("ascii"),
-                            }
-                            await elevenlabs_ws.send(json.dumps(audio_message))
+                        if payload and elevenlabs_ws:
+                            try:
+                                # Forward the audio payload directly to ElevenLabs
+                                # Twilio sends base64-encoded mulaw, ElevenLabs accepts it as-is
+                                audio_message = {
+                                    "user_audio_chunk": payload,
+                                }
+                                await elevenlabs_ws.send(json.dumps(audio_message))
+                            except websockets.exceptions.ConnectionClosed:
+                                logger.info("ElevenLabs WS closed while forwarding audio")
+                                break
 
                     elif event == "stop":
                         logger.info("Twilio stream stopped: session=%s", session_id)
                         break
 
                     elif event == "mark":
-                        # Mark events are acknowledgments
                         pass
 
             except WebSocketDisconnect:
@@ -396,19 +465,22 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
                     try:
                         data = json.loads(message)
                     except (json.JSONDecodeError, TypeError):
-                        # Binary audio data
+                        # Binary data - skip
                         continue
 
                     msg_type = data.get("type")
 
                     if msg_type == "audio":
-                        # ElevenLabs sends audio chunks
-                        audio_data = data.get("audio", {})
-                        audio_b64 = audio_data.get("chunk") or audio_data.get("data")
+                        # ElevenLabs sends audio chunks - check multiple possible field paths
+                        audio_b64 = None
+                        if "audio" in data:
+                            audio_obj = data["audio"]
+                            if isinstance(audio_obj, dict):
+                                audio_b64 = audio_obj.get("chunk") or audio_obj.get("data")
+                        if not audio_b64 and "audio_event" in data:
+                            audio_b64 = data["audio_event"].get("audio_base_64")
 
                         if audio_b64 and stream_sid:
-                            # ElevenLabs with ulaw_8000 output format sends mulaw directly
-                            # Forward as-is to Twilio
                             twilio_msg = {
                                 "event": "media",
                                 "streamSid": stream_sid,
@@ -419,7 +491,6 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
                             await websocket.send_json(twilio_msg)
 
                     elif msg_type == "agent_response":
-                        # Agent text response - add to transcript
                         text = data.get("agent_response_text", "") or data.get("text", "")
                         if text:
                             session.setdefault("transcript", []).append({
@@ -429,7 +500,6 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
                             logger.info("Agent said: %s", text[:100])
 
                     elif msg_type == "user_transcript":
-                        # User speech transcribed
                         text = data.get("user_transcript_text", "") or data.get("text", "")
                         if text:
                             session.setdefault("transcript", []).append({
@@ -439,26 +509,28 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
                             logger.info("User said: %s", text[:100])
 
                     elif msg_type == "conversation_initiation_metadata":
-                        # Connection metadata from ElevenLabs
-                        conversation_id = data.get("conversation_initiation_metadata_event", {}).get("conversation_id")
+                        conv_meta = data.get("conversation_initiation_metadata_event", {})
+                        conversation_id = conv_meta.get("conversation_id")
                         if conversation_id:
                             session["elevenlabs_conversation_id"] = conversation_id
                             logger.info("ElevenLabs conversation started: %s", conversation_id)
 
                     elif msg_type == "interruption":
-                        # User interrupted the agent - send clear message to Twilio
                         if stream_sid:
-                            clear_msg = {
+                            await websocket.send_json({
                                 "event": "clear",
                                 "streamSid": stream_sid,
-                            }
-                            await websocket.send_json(clear_msg)
+                            })
                             logger.info("User interruption detected, cleared Twilio buffer")
 
                     elif msg_type == "ping":
-                        # Respond to ping
-                        pong = {"type": "pong", "event_id": data.get("ping_event", {}).get("event_id")}
-                        await elevenlabs_ws.send(json.dumps(pong))
+                        # Respond to ping to keep connection alive
+                        event_id = None
+                        if "ping_event" in data:
+                            event_id = data["ping_event"].get("event_id")
+                        if event_id:
+                            pong = {"type": "pong", "event_id": event_id}
+                            await elevenlabs_ws.send(json.dumps(pong))
 
                     elif msg_type == "error":
                         error_msg = data.get("message", "Unknown error")
@@ -493,8 +565,11 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
             except Exception:
                 pass
 
+        # Delete the temporary ElevenLabs agent
+        if agent_id and session.get("elevenlabs_key"):
+            await _delete_elevenlabs_agent(session["elevenlabs_key"], agent_id)
+
         # Keep session for a while for status queries, then clean up
-        # (In production, use Redis or DB for persistent sessions)
         asyncio.get_event_loop().call_later(
             300,  # 5 minutes
             lambda: _sessions.pop(session_id, None),
