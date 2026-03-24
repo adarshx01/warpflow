@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections import deque
 from typing import Any, Dict
 
 from sqlalchemy import select as sa_select
@@ -8,6 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Workflow, User, UserSecret
 from app.security import decrypt_value
 from app.services.agent.engine import WorkflowEngine
+from app.services.google.common import get_user_credential, get_valid_access_token
+from app.services.google.google_workspace_service import (
+    GoogleWorkspaceService,
+    GOOGLE_NODE_TYPES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +23,164 @@ DEFAULT_PROMPT_TEMPLATE = (
     "Snippet: {snippet}\n\n"
     "Please summarize this article in 2-3 sentences and send the summary to the configured Slack channel."
 )
+
+# Node types that are entry-points only (no operation to execute)
+_TRIGGER_NODE_TYPES = {
+    "manual-trigger",
+    "schedule-trigger",
+    "webhook-trigger",
+    "email-trigger",
+    "news-trigger",
+    "slack-trigger",
+    "telegram-trigger",
+}
+
+
+async def execute_direct_workflow(
+    db: AsyncSession,
+    wf: Workflow,
+    trigger_data: Dict[str, Any],
+) -> None:
+    """
+    Execute a workflow that has NO ai-agent node by walking the node graph
+    and calling each connected service node directly.
+
+    Currently supports all Google Workspace node types:
+      google-sheets, google-docs, google-drive, gmail, google-forms
+
+    Steps
+    -----
+    1. Build an adjacency map from the workflow connections.
+    2. BFS from every trigger node to collect downstream service nodes in order.
+    3. For each service node, resolve OAuth credential → access token.
+    4. Instantiate GoogleWorkspaceService and dispatch the configured operation.
+    5. Store previous step output in `context` so later nodes can reference it.
+    """
+    nodes: list[dict] = wf.nodes or []
+    connections: list[dict] = wf.connections or []
+
+    # Build id → node map
+    node_map: dict[str, dict] = {n["id"]: n for n in nodes}
+
+    # Build directed adjacency: source → {targets}
+    adj: dict[str, set[str]] = {n["id"]: set() for n in nodes}
+    for conn in connections:
+        src = conn.get("from") or conn.get("sourceId", "")
+        tgt = conn.get("to") or conn.get("targetId", "")
+        if src in adj:
+            adj[src].add(tgt)
+
+    # Collect trigger nodes as BFS starting points
+    trigger_nodes = [n for n in nodes if n.get("type", "") in _TRIGGER_NODE_TYPES]
+    if not trigger_nodes:
+        # Fall back to nodes with no incoming edges
+        incoming: set[str] = {
+            tgt
+            for conn in connections
+            for tgt in [(conn.get("to") or conn.get("targetId", ""))]
+            if tgt
+        }
+        trigger_nodes = [n for n in nodes if n["id"] not in incoming]
+
+    # BFS traversal
+    visited: set[str] = set()
+    queue: deque[str] = deque(n["id"] for n in trigger_nodes)
+    execution_order: list[dict] = []
+
+    while queue:
+        nid = queue.popleft()
+        if nid in visited:
+            continue
+        visited.add(nid)
+        node = node_map.get(nid)
+        if node and node.get("type", "") not in _TRIGGER_NODE_TYPES:
+            execution_order.append(node)
+        for neighbor in adj.get(nid, set()):
+            if neighbor not in visited:
+                queue.append(neighbor)
+
+    if not execution_order:
+        logger.warning(
+            "Workflow %s: No executable service nodes found downstream of triggers.",
+            wf.id,
+        )
+        return
+
+    logger.info(
+        "⚡ Direct execution for Workflow %s — %d node(s): %s",
+        wf.id,
+        len(execution_order),
+        [n.get("type") for n in execution_order],
+    )
+
+    # Load the workflow owner
+    user = await db.get(User, wf.owner_id)
+    if not user:
+        logger.error("Workflow %s: Owner user not found — skipping.", wf.id)
+        return
+
+    context: Dict[str, Any] = {"trigger": trigger_data}
+
+    for node in execution_order:
+        node_type = node.get("type", "")
+        node_data = node.get("data", {})
+        node_id = node.get("id", "?")
+
+        # ── Google Workspace nodes ────────────────────────
+        if node_type in GOOGLE_NODE_TYPES:
+            credential_id = node_data.get("credentialId")
+            operation = node_data.get("operation", "")
+            params: Dict[str, Any] = node_data.get("params") or {}
+
+            if not credential_id:
+                logger.warning(
+                    "Workflow %s: Node %s (%s) has no credentialId — skipping.",
+                    wf.id, node_id, node_type,
+                )
+                continue
+
+            if not operation:
+                logger.warning(
+                    "Workflow %s: Node %s (%s) has no operation configured — skipping.",
+                    wf.id, node_id, node_type,
+                )
+                continue
+
+            try:
+                credential = await get_user_credential(
+                    db, uuid.UUID(str(credential_id)), user.id
+                )
+                token = await get_valid_access_token(credential, db)
+            except Exception as exc:
+                logger.error(
+                    "Workflow %s: Node %s (%s) failed credential resolution: %s",
+                    wf.id, node_id, node_type, exc,
+                )
+                continue
+
+            svc = GoogleWorkspaceService(token)
+            try:
+                result = await svc.execute(node_type, operation, params)
+                context[node_id] = result
+                logger.info(
+                    "✅ Workflow %s: Node %s (%s → %s) succeeded. Keys: %s",
+                    wf.id, node_id, node_type, operation,
+                    list(result.keys()) if isinstance(result, dict) else type(result).__name__,
+                )
+            except Exception as exc:
+                logger.error(
+                    "❌ Workflow %s: Node %s (%s → %s) failed: %s",
+                    wf.id, node_id, node_type, operation, exc,
+                )
+                context[f"{node_id}_error"] = str(exc)
+
+        else:
+            logger.info(
+                "Workflow %s: Node %s (%s) is not a supported direct-execution type — skipping.",
+                wf.id, node_id, node_type,
+            )
+
+    logger.info("✅ Direct execution of Workflow %s complete.", wf.id)
 
 
 async def start_workflow(
@@ -41,7 +205,12 @@ async def start_workflow(
     # 2. Find the AI agent node
     agent_node = next((n for n in nodes if n.get("type") == "ai-agent"), None)
     if not agent_node:
-        logger.warning("Workflow %s has no ai-agent node — nothing to execute.", workflow_id)
+        # ── NEW: Direct execution path (no AI agent required) ──────────
+        logger.info(
+            "Workflow %s has no ai-agent node — attempting direct service execution.",
+            workflow_id,
+        )
+        await execute_direct_workflow(db, wf, trigger_data)
         return
 
     agent_data = agent_node.get("data", {})
