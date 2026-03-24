@@ -28,6 +28,7 @@ from app.services.cv_router.router import router as cv_router
 from app.services.twilio.router import router as twilio_router
 from app.services.elevenlabs.router import router as elevenlabs_router
 from app.services.postgresql.router import router as postgresql_router
+from app.services.call_conversation.router import router as call_conversation_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -113,6 +114,7 @@ app.include_router(cv_router)
 app.include_router(twilio_router)
 app.include_router(elevenlabs_router)
 app.include_router(postgresql_router)
+app.include_router(call_conversation_router)
 
 
 @app.get("/health")

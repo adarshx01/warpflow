@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # CV Service
     CV_SERVICE_URL: str = "http://localhost:8080"
 
+    # Public URL for webhook callbacks (Twilio, etc.) — set to your ngrok URL
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

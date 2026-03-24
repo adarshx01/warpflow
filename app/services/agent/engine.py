@@ -43,11 +43,14 @@ For CV (Computer Vision) tasks:
 5. For image inference: Use the configured image_url or image_path directly
 
 For Twilio (phone calls and SMS):
-1. Use twilio_make_call to initiate outbound phone calls - requires 'to', 'from', and 'twiml' parameters
-2. The 'twiml' parameter can be XML like '<Response><Say>Hello!</Say></Response>' or a URL to a TwiML endpoint
-3. Use twilio_send_sms to send text messages - requires 'to', 'from', and 'body' parameters
-4. Phone numbers must be in E.164 format (e.g., +1234567890)
-5. Use twilio_get_call_status or twilio_get_message_status to check delivery status
+1. For interactive voice conversations, ALWAYS prefer twilio_make_conversation_call over twilio_make_call
+2. twilio_make_conversation_call creates a real-time AI voice conversation with the person - they can talk back and forth naturally
+3. Provide a clear system_prompt telling the AI voice agent what to discuss, its personality, and goals
+4. Provide a warm first_message as the greeting when the person answers
+5. Use twilio_make_call ONLY for one-way announcements (no conversation needed)
+6. Use twilio_send_sms to send text messages - requires 'to', 'from', and 'body' parameters
+7. Phone numbers must be in E.164 format (e.g., +1234567890)
+8. Use twilio_get_call_status or twilio_get_message_status to check delivery status
 
 For ElevenLabs (text-to-speech):
 1. Use elevenlabs_list_voices first to get available voice IDs
@@ -409,7 +412,7 @@ class WorkflowEngine:
             elif tool_name.startswith("cv_"):
                 # CV tools take (user_id, params) - no db session needed
                 result = await fn(token, args)
-            elif tool_name.startswith("twilio_") or tool_name.startswith("elevenlabs_") or tool_name.startswith("postgres_"):
+            elif tool_name.startswith("twilio_") or tool_name.startswith("elevenlabs_") or tool_name.startswith("postgres_") or tool_name.startswith("call_conversation_"):
                 # Secret-based tools need db session to fetch credentials
                 result = await fn(token, args, self.db)
             else:

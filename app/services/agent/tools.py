@@ -48,6 +48,9 @@ from app.services.elevenlabs.router import (
 from app.services.postgresql.router import (
     execute_query, select_rows, insert_row, update_rows, delete_rows,
 )
+from app.services.call_conversation.router import (
+    start_conversation_call as _start_conversation_call_fn,
+)
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
@@ -87,6 +90,11 @@ async def _twilio_get_message_status_wrapper(user_id: str, params: dict[str, Any
     from uuid import UUID
     account_sid, auth_token = await _get_twilio_credentials(db, UUID(user_id))
     return await get_message_status(account_sid, auth_token, params)
+
+
+async def _twilio_conversation_call_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
+    """Wrapper for start_conversation_call that is called by the agent."""
+    return await _start_conversation_call_fn(user_id, params, db)
 
 
 async def _elevenlabs_tts_wrapper(user_id: str, params: dict[str, Any], db) -> dict:
@@ -1241,6 +1249,22 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
             },
             "_fn": _twilio_get_message_status_wrapper,
         },
+        {
+            "name": "twilio_make_conversation_call",
+            "description": "Make an outbound phone call with real-time AI voice conversation. The AI agent will have a back-and-forth voice conversation with the person who answers. Uses ElevenLabs Conversational AI for natural speech. The call continues until the user or agent ends it.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient phone number in E.164 format (+1234567890)"},
+                    "from": {"type": "string", "description": "Your Twilio phone number in E.164 format"},
+                    "system_prompt": {"type": "string", "description": "Instructions for the AI voice agent describing its role, personality, and what to discuss during the call"},
+                    "first_message": {"type": "string", "description": "The first thing the AI says when the call is answered (greeting)"},
+                    "voice_id": {"type": "string", "description": "Optional ElevenLabs voice ID for the AI voice"},
+                },
+                "required": ["to", "from", "system_prompt", "first_message"],
+            },
+            "_fn": _twilio_conversation_call_wrapper,
+        },
     ],
     "elevenlabs": [
         {
@@ -1280,6 +1304,22 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "required": ["voice_id"],
             },
             "_fn": _elevenlabs_get_voice_wrapper,
+        },
+        {
+            "name": "twilio_make_conversation_call",
+            "description": "Make an outbound phone call with real-time AI voice conversation. The AI agent will have a back-and-forth voice conversation with the person who answers. Uses ElevenLabs Conversational AI for natural speech. The call continues until the user or agent ends it. Requires both Twilio and ElevenLabs credentials configured.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient phone number in E.164 format (+1234567890)"},
+                    "from": {"type": "string", "description": "Your Twilio phone number in E.164 format"},
+                    "system_prompt": {"type": "string", "description": "Instructions for the AI voice agent describing its role, personality, and what to discuss during the call"},
+                    "first_message": {"type": "string", "description": "The first thing the AI says when the call is answered (greeting)"},
+                    "voice_id": {"type": "string", "description": "Optional ElevenLabs voice ID for the AI voice"},
+                },
+                "required": ["to", "from", "system_prompt", "first_message"],
+            },
+            "_fn": _twilio_conversation_call_wrapper,
         },
     ],
     "postgresql": [
