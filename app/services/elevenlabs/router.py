@@ -61,7 +61,7 @@ async def text_to_speech(api_key: str, params: Dict[str, Any]) -> Dict[str, Any]
     """Convert text to speech using ElevenLabs."""
     text = params.get('text')
     voice_id = params.get('voice_id')
-    model_id = params.get('model_id', 'eleven_monolingual_v1')
+    model_id = params.get('model_id', 'eleven_v3')
     stability = params.get('stability', 0.5)
     similarity_boost = params.get('similarity_boost', 0.5)
 

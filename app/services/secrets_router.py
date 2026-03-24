@@ -39,6 +39,8 @@ _ALLOWED_KEYS = {
     "s3_region",
     # ElevenLabs
     "elevenlabs_api_key",
+    "twilio_account_sid",
+    "twilio_auth_token",
 }
 
 # These keys hold credentials that are only used inside the backend.
@@ -50,6 +52,9 @@ _BACKEND_ONLY_KEYS = {
     "s3_access_key",
     "s3_secret_key",
     "elevenlabs_api_key",
+    "twilio_account_sid",
+    "twilio_auth_token",
+
 }
 
 

@@ -75,6 +75,12 @@ async def make_call(account_sid: str, auth_token: str, params: Dict[str, Any]) -
     if not to or not from_:
         raise HTTPException(status_code=400, detail="'to' and 'from' phone numbers are required")
 
+    if not twiml:
+        raise HTTPException(
+            status_code=400,
+            detail="'twiml' is required. Provide TwiML instructions (e.g., '<Response><Say>Hello!</Say></Response>') or a URL to fetch TwiML from."
+        )
+
     client = Client(account_sid, auth_token)
 
     call_params = {'to': to, 'from_': from_}
@@ -94,7 +100,7 @@ async def make_call(account_sid: str, auth_token: str, params: Dict[str, Any]) -
         'sid': call.sid,
         'status': call.status,
         'to': call.to,
-        'from': call.from_,
+        'from': getattr(call, 'from_', None) or getattr(call, 'from_number', None) or from_,
         'date_created': call.date_created.isoformat() if call.date_created else None,
     }
 
@@ -123,7 +129,7 @@ async def send_sms(account_sid: str, auth_token: str, params: Dict[str, Any]) ->
         'sid': message.sid,
         'status': message.status,
         'to': message.to,
-        'from': message.from_,
+        'from': getattr(message, 'from_', None) or from_,
         'body': message.body,
         'date_created': message.date_created.isoformat() if message.date_created else None,
     }
@@ -150,7 +156,7 @@ async def get_call_status(account_sid: str, auth_token: str, params: Dict[str, A
         'sid': call.sid,
         'status': call.status,
         'to': call.to,
-        'from': call.from_,
+        'from': getattr(call, 'from_', None),
         'duration': call.duration,
         'date_created': call.date_created.isoformat() if call.date_created else None,
     }
@@ -177,7 +183,7 @@ async def get_message_status(account_sid: str, auth_token: str, params: Dict[str
         'sid': message.sid,
         'status': message.status,
         'to': message.to,
-        'from': message.from_,
+        'from': getattr(message, 'from_', None),
         'body': message.body,
         'date_created': message.date_created.isoformat() if message.date_created else None,
     }
