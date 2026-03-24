@@ -39,6 +39,15 @@ from app.services.context.router import (
 from app.services.cv_router.router import (
     cv_train_model, cv_load_model, cv_infer, cv_list_models,
 )
+from app.services.twilio.router import (
+    make_call, send_sms, get_call_status, get_message_status,
+)
+from app.services.elevenlabs.router import (
+    text_to_speech, list_voices, get_voice,
+)
+from app.services.postgresql.router import (
+    execute_query, select_rows, insert_row, update_rows, delete_rows,
+)
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
@@ -52,6 +61,9 @@ CREDENTIAL_LESS_TOOLS = {
     "context-store",
     "cv-train",
     "cv-inference",
+    "twilio",
+    "elevenlabs",
+    "postgresql",
 }
 
 
@@ -1072,6 +1084,171 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "required": [],
             },
             "_fn": cv_list_models,
+        },
+    ],
+    "twilio": [
+        {
+            "name": "twilio_make_call",
+            "description": "Make an outbound phone call using Twilio with TwiML or webhook URL",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient phone number in E.164 format (+1234567890)"},
+                    "from": {"type": "string", "description": "Your Twilio phone number"},
+                    "twiml": {"type": "string", "description": "TwiML XML or URL to TwiML endpoint"},
+                    "statusCallback": {"type": "string", "description": "Optional webhook URL for call status updates"},
+                },
+                "required": ["to", "from", "twiml"],
+            },
+            "_fn": make_call,
+        },
+        {
+            "name": "twilio_send_sms",
+            "description": "Send an SMS message using Twilio",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient phone number in E.164 format"},
+                    "from": {"type": "string", "description": "Your Twilio phone number"},
+                    "body": {"type": "string", "description": "SMS message body (max 1600 chars)"},
+                },
+                "required": ["to", "from", "body"],
+            },
+            "_fn": send_sms,
+        },
+        {
+            "name": "twilio_get_call_status",
+            "description": "Get the status of a call by SID",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sid": {"type": "string", "description": "Call SID (starts with CA)"},
+                },
+                "required": ["sid"],
+            },
+            "_fn": get_call_status,
+        },
+        {
+            "name": "twilio_get_message_status",
+            "description": "Get the status of an SMS message by SID",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sid": {"type": "string", "description": "Message SID (starts with SM)"},
+                },
+                "required": ["sid"],
+            },
+            "_fn": get_message_status,
+        },
+    ],
+    "elevenlabs": [
+        {
+            "name": "elevenlabs_text_to_speech",
+            "description": "Convert text to natural-sounding speech using ElevenLabs. Returns base64-encoded audio that can be played or saved.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Text to convert to speech (max 5000 chars)"},
+                    "voice_id": {"type": "string", "description": "Voice ID (use elevenlabs_list_voices to get available voices)"},
+                    "model_id": {"type": "string", "description": "Model ID (default: eleven_multilingual_v2)"},
+                    "stability": {"type": "number", "description": "Voice stability 0.0-1.0 (default: 0.5)"},
+                    "similarity_boost": {"type": "number", "description": "Similarity boost 0.0-1.0 (default: 0.5)"},
+                },
+                "required": ["text", "voice_id"],
+            },
+            "_fn": text_to_speech,
+        },
+        {
+            "name": "elevenlabs_list_voices",
+            "description": "List all available ElevenLabs voices with their IDs and names",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+            "_fn": list_voices,
+        },
+        {
+            "name": "elevenlabs_get_voice",
+            "description": "Get details of a specific voice by ID",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "voice_id": {"type": "string", "description": "Voice ID"},
+                },
+                "required": ["voice_id"],
+            },
+            "_fn": get_voice,
+        },
+    ],
+    "postgresql": [
+        {
+            "name": "postgres_query",
+            "description": "Execute a raw SQL query (SELECT, INSERT, UPDATE, DELETE) on PostgreSQL database",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "SQL query to execute"},
+                    "params": {"type": "array", "items": {"type": "string"}, "description": "Query parameters for placeholders ($1, $2, etc)"},
+                },
+                "required": ["query"],
+            },
+            "_fn": execute_query,
+        },
+        {
+            "name": "postgres_select",
+            "description": "Select rows from a PostgreSQL table with optional WHERE clause and LIMIT",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name"},
+                    "columns": {"type": "string", "description": "Columns to select (comma-separated or * for all)"},
+                    "where": {"type": "string", "description": "Optional WHERE clause (without the WHERE keyword)"},
+                    "limit": {"type": "integer", "description": "Optional max number of rows to return"},
+                },
+                "required": ["table"],
+            },
+            "_fn": select_rows,
+        },
+        {
+            "name": "postgres_insert",
+            "description": "Insert a new row into a PostgreSQL table",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name"},
+                    "data": {"type": "object", "description": "Row data as object with column names as keys"},
+                },
+                "required": ["table", "data"],
+            },
+            "_fn": insert_row,
+        },
+        {
+            "name": "postgres_update",
+            "description": "Update rows in a PostgreSQL table matching WHERE clause",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name"},
+                    "data": {"type": "object", "description": "Data to update as object with column names as keys"},
+                    "where": {"type": "string", "description": "WHERE clause (required for safety)"},
+                },
+                "required": ["table", "data", "where"],
+            },
+            "_fn": update_rows,
+        },
+        {
+            "name": "postgres_delete",
+            "description": "Delete rows from a PostgreSQL table matching WHERE clause",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name"},
+                    "where": {"type": "string", "description": "WHERE clause (required for safety)"},
+                },
+                "required": ["table", "where"],
+            },
+            "_fn": delete_rows,
         },
     ],
 }

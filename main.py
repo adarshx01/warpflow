@@ -25,6 +25,9 @@ from app.services.secrets_router import router as secrets_router
 from app.services.ml.router import router as ml_router
 from app.services.context.router import router as context_router
 from app.services.cv_router.router import router as cv_router
+from app.services.twilio.router import router as twilio_router
+from app.services.elevenlabs.router import router as elevenlabs_router
+from app.services.postgresql.router import router as postgresql_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -107,6 +110,9 @@ app.include_router(secrets_router)
 app.include_router(ml_router)
 app.include_router(context_router)
 app.include_router(cv_router)
+app.include_router(twilio_router)
+app.include_router(elevenlabs_router)
+app.include_router(postgresql_router)
 
 
 @app.get("/health")
