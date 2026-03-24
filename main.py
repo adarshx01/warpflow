@@ -25,6 +25,12 @@ from app.services.secrets_router import router as secrets_router
 from app.services.ml.router import router as ml_router
 from app.services.context.router import router as context_router
 from app.services.cv_router.router import router as cv_router
+from app.workflows.execution import router as execution_router
+from app.webhooks.router import router as webhooks_router
+from app.services.scheduler import init_schedules, start_scheduler, stop_scheduler
+from app.services.triggers.email_poller import start_email_poller, stop_email_poller
+from app.services.triggers.news_poller import start_news_poller, stop_news_poller
+from app.services.triggers.news_router import router as news_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -39,7 +45,17 @@ async def lifespan(app: FastAPI):
     # Seed node templates
     await _seed_node_templates()
 
+    # Start scheduler and trigger pollers
+    start_scheduler()
+    await init_schedules()
+    start_email_poller()
+    start_news_poller()
+
     yield
+
+    await stop_news_poller()
+    await stop_email_poller()
+    stop_scheduler()
     await engine.dispose()
 
 
@@ -107,6 +123,9 @@ app.include_router(secrets_router)
 app.include_router(ml_router)
 app.include_router(context_router)
 app.include_router(cv_router)
+app.include_router(execution_router)
+app.include_router(webhooks_router)
+app.include_router(news_router)
 
 
 @app.get("/health")

@@ -39,6 +39,42 @@ from app.services.context.router import (
 from app.services.cv_router.router import (
     cv_train_model, cv_load_model, cv_infer, cv_list_models,
 )
+from app.services.slack.service import (
+    slack_send_message, slack_update_message, slack_delete_message, slack_get_permalink,
+    slack_list_channels, slack_get_channel_info, slack_get_channel_history,
+    slack_get_thread_replies, slack_invite_to_channel, slack_create_channel, slack_archive_channel,
+    slack_list_users, slack_get_user_info, slack_lookup_user_by_email, slack_set_user_status,
+    slack_add_reaction, slack_remove_reaction, slack_get_reactions,
+    slack_upload_file, slack_list_files, slack_delete_file,
+    slack_pin_message, slack_unpin_message, slack_list_pins,
+    slack_search_messages, slack_get_workspace_info, slack_get_bot_info, slack_add_reminder,
+)
+from app.services.telegram.service import (
+    telegram_get_me, telegram_get_my_commands, telegram_set_my_commands,
+    telegram_send_message, telegram_edit_message, telegram_delete_message,
+    telegram_forward_message, telegram_copy_message, telegram_pin_message,
+    telegram_unpin_message, telegram_unpin_all_messages,
+    telegram_send_photo, telegram_send_document, telegram_send_audio,
+    telegram_send_video, telegram_send_animation, telegram_send_sticker,
+    telegram_send_location, telegram_send_poll,
+    telegram_get_chat, telegram_get_chat_member_count, telegram_get_chat_member,
+    telegram_ban_chat_member, telegram_unban_chat_member, telegram_restrict_chat_member,
+    telegram_promote_chat_member, telegram_set_chat_title, telegram_set_chat_description,
+    telegram_leave_chat, telegram_export_invite_link,
+    telegram_get_file, telegram_answer_callback_query,
+    telegram_set_webhook, telegram_delete_webhook, telegram_get_webhook_info,
+)
+from app.services.aws.s3_service import (
+    s3_upload_text, s3_download_as_text, s3_delete_object, s3_copy_object,
+    s3_move_object, s3_get_object_metadata,
+    s3_list_objects, s3_list_buckets,
+    s3_generate_presigned_url, s3_generate_presigned_post,
+    s3_create_bucket, s3_delete_bucket, s3_get_bucket_location,
+    s3_get_object_acl, s3_put_object_acl,
+    s3_get_bucket_versioning, s3_put_bucket_versioning, s3_list_object_versions,
+    s3_get_object_tags, s3_put_object_tags, s3_delete_object_tags,
+    s3_put_bucket_website, s3_get_bucket_website, s3_delete_bucket_website,
+)
 
 ServiceFn = Callable[[str, dict[str, Any]], Awaitable[dict]]
 
@@ -1072,6 +1108,233 @@ TOOL_REGISTRY: dict[str, list[dict[str, Any]]] = {
                 "required": [],
             },
             "_fn": cv_list_models,
+        },
+    ],
+    "slack": [
+        {
+            "name": "slack_send_message",
+            "description": "Send a message to a Slack channel or user. Supports text, blocks, and thread replies.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID or name (e.g. #general or C012AB3CD)"},
+                "text": {"type": "string", "description": "Message text (supports Slack mrkdwn)"},
+                "thread_ts": {"type": "string", "description": "Thread timestamp to reply in a thread"},
+                "username": {"type": "string", "description": "Custom bot display name"},
+                "icon_emoji": {"type": "string", "description": "Emoji to use as icon (e.g. :robot_face:)"},
+            }, "required": ["channel", "text"]},
+            "_fn": slack_send_message,
+        },
+        {
+            "name": "slack_update_message",
+            "description": "Update the content of an existing Slack message.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel containing the message"},
+                "ts": {"type": "string", "description": "Timestamp of the message to update"},
+                "text": {"type": "string", "description": "New message text"},
+            }, "required": ["channel", "ts", "text"]},
+            "_fn": slack_update_message,
+        },
+        {
+            "name": "slack_delete_message",
+            "description": "Delete a message from a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "ts": {"type": "string", "description": "Timestamp of the message to delete"},
+            }, "required": ["channel", "ts"]},
+            "_fn": slack_delete_message,
+        },
+        {
+            "name": "slack_list_channels",
+            "description": "List all public and private channels in the Slack workspace.",
+            "parameters": {"type": "object", "properties": {
+                "limit": {"type": "integer", "description": "Max channels to return (default 100)"},
+                "types": {"type": "string", "description": "Channel types: public_channel, private_channel, mpim, im"},
+                "exclude_archived": {"type": "boolean", "description": "Exclude archived channels"},
+            }, "required": []},
+            "_fn": slack_list_channels,
+        },
+        {
+            "name": "slack_get_channel_history",
+            "description": "Retrieve recent messages from a Slack channel.",
+            "parameters": {"type": "object", "properties": {
+                "channel": {"type": "string", "description": "Channel ID"},
+                "limit": {"type": "integer", "description": "Number of messages to return"},
+            }, "required": ["channel"]},
+            "_fn": slack_get_channel_history,
+        },
+        {
+            "name": "slack_list_users",
+            "description": "List all members of the Slack workspace.",
+            "parameters": {"type": "object", "properties": {
+                "limit": {"type": "integer", "description": "Max users to return"},
+            }, "required": []},
+            "_fn": slack_list_users,
+        },
+        {
+            "name": "slack_upload_file",
+            "description": "Upload a text file or snippet to Slack.",
+            "parameters": {"type": "object", "properties": {
+                "content": {"type": "string", "description": "Text content of the file"},
+                "filename": {"type": "string", "description": "Filename (e.g. report.txt)"},
+                "channels": {"type": "string", "description": "Comma-separated channel IDs to share the file in"},
+            }, "required": ["content"]},
+            "_fn": slack_upload_file,
+        },
+        {
+            "name": "slack_search_messages",
+            "description": "Search for messages in Slack matching a query.",
+            "parameters": {"type": "object", "properties": {
+                "query": {"type": "string", "description": "Search query string"},
+                "count": {"type": "integer", "description": "Number of results to return"},
+            }, "required": ["query"]},
+            "_fn": slack_search_messages,
+        },
+        {
+            "name": "slack_add_reminder",
+            "description": "Create a reminder for a user in Slack.",
+            "parameters": {"type": "object", "properties": {
+                "text": {"type": "string", "description": "Reminder message"},
+                "time": {"type": "string", "description": "When to send: Unix timestamp or natural language like 'in 30 minutes'"},
+                "user": {"type": "string", "description": "User ID to remind (defaults to bot user)"},
+            }, "required": ["text", "time"]},
+            "_fn": slack_add_reminder,
+        },
+    ],
+    "telegram": [
+        {
+            "name": "telegram_send_message",
+            "description": "Send a text message to a Telegram chat, group, or channel. Supports HTML formatting.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Target chat ID or @username"},
+                "text": {"type": "string", "description": "Message text (HTML supported)"},
+                "parse_mode": {"type": "string", "description": "Formatting: HTML or Markdown"},
+                "disable_notification": {"type": "boolean", "description": "Send silently"},
+            }, "required": ["chat_id", "text"]},
+            "_fn": telegram_send_message,
+        },
+        {
+            "name": "telegram_edit_message",
+            "description": "Edit the text of an existing Telegram message.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to edit"},
+                "text": {"type": "string", "description": "New message text"},
+            }, "required": ["chat_id", "message_id", "text"]},
+            "_fn": telegram_edit_message,
+        },
+        {
+            "name": "telegram_delete_message",
+            "description": "Delete a message from a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to delete"},
+            }, "required": ["chat_id", "message_id"]},
+            "_fn": telegram_delete_message,
+        },
+        {
+            "name": "telegram_forward_message",
+            "description": "Forward a message from one Telegram chat to another.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Destination chat ID"},
+                "from_chat_id": {"type": "string", "description": "Source chat ID"},
+                "message_id": {"type": "integer", "description": "Message ID to forward"},
+            }, "required": ["chat_id", "from_chat_id", "message_id"]},
+            "_fn": telegram_forward_message,
+        },
+        {
+            "name": "telegram_send_photo",
+            "description": "Send a photo to a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Target chat ID"},
+                "photo": {"type": "string", "description": "URL or file_id of the photo"},
+                "caption": {"type": "string", "description": "Optional photo caption"},
+            }, "required": ["chat_id", "photo"]},
+            "_fn": telegram_send_photo,
+        },
+        {
+            "name": "telegram_get_chat",
+            "description": "Get information about a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Chat ID or @username"},
+            }, "required": ["chat_id"]},
+            "_fn": telegram_get_chat,
+        },
+        {
+            "name": "telegram_send_poll",
+            "description": "Send a poll to a Telegram chat.",
+            "parameters": {"type": "object", "properties": {
+                "chat_id": {"type": "string", "description": "Target chat ID"},
+                "question": {"type": "string", "description": "Poll question"},
+                "options": {"type": "array", "items": {"type": "string"}, "description": "List of answer options"},
+            }, "required": ["chat_id", "question", "options"]},
+            "_fn": telegram_send_poll,
+        },
+    ],
+    "aws": [
+        {
+            "name": "s3_upload_text",
+            "description": "Upload a text string as a file to S3.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key (path in bucket)"},
+                "content": {"type": "string", "description": "Text content to upload"},
+                "content_type": {"type": "string", "description": "MIME type (default: text/plain)"},
+            }, "required": ["bucket", "key", "content"]},
+            "_fn": s3_upload_text,
+        },
+        {
+            "name": "s3_download_as_text",
+            "description": "Download an S3 object and return its content as text.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_download_as_text,
+        },
+        {
+            "name": "s3_delete_object",
+            "description": "Delete an object from S3.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key to delete"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_delete_object,
+        },
+        {
+            "name": "s3_list_objects",
+            "description": "List objects in an S3 bucket, optionally filtered by prefix.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "prefix": {"type": "string", "description": "Filter prefix (folder path)"},
+                "max_keys": {"type": "integer", "description": "Maximum number of objects to return"},
+            }, "required": ["bucket"]},
+            "_fn": s3_list_objects,
+        },
+        {
+            "name": "s3_list_buckets",
+            "description": "List all S3 buckets in the account.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+            "_fn": s3_list_buckets,
+        },
+        {
+            "name": "s3_generate_presigned_url",
+            "description": "Generate a pre-signed URL for temporary access to an S3 object.",
+            "parameters": {"type": "object", "properties": {
+                "bucket": {"type": "string", "description": "S3 bucket name"},
+                "key": {"type": "string", "description": "Object key"},
+                "expiration": {"type": "integer", "description": "URL expiry in seconds (default 3600)"},
+            }, "required": ["bucket", "key"]},
+            "_fn": s3_generate_presigned_url,
+        },
+        {
+            "name": "s3_copy_object",
+            "description": "Copy an S3 object from one location to another.",
+            "parameters": {"type": "object", "properties": {
+                "source_bucket": {"type": "string", "description": "Source bucket"},
+                "source_key": {"type": "string", "description": "Source object key"},
+                "dest_bucket": {"type": "string", "description": "Destination bucket"},
+                "dest_key": {"type": "string", "description": "Destination object key"},
+            }, "required": ["source_bucket", "source_key", "dest_bucket", "dest_key"]},
+            "_fn": s3_copy_object,
         },
     ],
 }
