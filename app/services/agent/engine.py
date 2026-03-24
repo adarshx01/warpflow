@@ -222,6 +222,16 @@ class WorkflowEngine:
                 if node_data.get("confidence_threshold"):
                     config_info["confidence_threshold"] = node_data["confidence_threshold"]
 
+            # Extract Telegram configurations
+            elif node_type == "telegram":
+                if node_data.get("defaultChatId"):
+                    config_info["defaultChatId"] = node_data["defaultChatId"]
+
+            # Extract Slack configurations
+            elif node_type == "slack":
+                if node_data.get("defaultChannel"):
+                    config_info["defaultChannel"] = node_data["defaultChannel"]
+
             # Only add if we have actual config values beyond just node_type
             if len(config_info) > 1:
                 self._node_configs[node_type] = config_info
@@ -354,11 +364,20 @@ class WorkflowEngine:
                 continue
 
             node_data = node.get("data", {})
+            
+            # Nodes like Telegram and Slack store their bot token directly in the node configuration
+            direct_token = node_data.get("botToken") or node_data.get("apiKey") or node_data.get("token")
+            if direct_token:
+                for tool_def in TOOL_REGISTRY[node_type]:
+                    self._tool_map[tool_def["name"]] = (tool_def["_fn"], direct_token)
+                registered_types.add(node_type)
+                continue
+
             credential_id = node_data.get("credentialId")
 
             if not credential_id:
                 logger.warning(
-                    "Node %s (%s) has no credentialId configured, skipping",
+                    "Node %s (%s) has no credentialId or botToken configured, skipping",
                     node.get("id"), node_type,
                 )
                 continue
