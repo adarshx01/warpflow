@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import NodeConfigModal from '../components/NodeConfigModal';
 import ExecuteModal from '../components/ExecuteModal';
+import { NodeIcon } from '../components/nodes/NodeIcon';
 
 interface NodeType {
   id: string;
@@ -588,7 +589,7 @@ const WorkflowBuilder = () => {
                         className="w-full p-3.5 bg-gradient-to-br from-slate-800/80 to-slate-800/40 hover:from-slate-700/80 hover:to-slate-700/40 border border-slate-700/50 hover:border-slate-600/80 rounded-xl flex items-center gap-3.5 transition-all group hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl cursor-grab active:cursor-grabbing"
                       >
                         <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${node.color} flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-lg ring-2 ring-white/10`}>
-                          {node.icon}
+                          <NodeIcon type={node.id} fallback={node.icon} className="text-white drop-shadow-md" size={24} />
                         </div>
                         <div className="flex-1 text-left">
                           <span className="text-sm font-semibold text-slate-100 block">{node.name}</span>
@@ -797,7 +798,9 @@ const WorkflowBuilder = () => {
                       <div className="absolute inset-0 opacity-30">
                         <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
                       </div>
-                      <div className="text-5xl relative z-10 drop-shadow-lg">{node.icon}</div>
+                      <div className="text-5xl relative z-10 drop-shadow-lg flex items-center justify-center">
+                        <NodeIcon type={node.type} fallback={node.icon} className="text-white drop-shadow-xl" size={48} />
+                      </div>
 
                       {/* Control Buttons */}
                       <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

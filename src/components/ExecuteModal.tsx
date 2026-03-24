@@ -92,6 +92,10 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
             'data-prep', 'supervised-train', 'unsupervised-train', 'model-inference',
             // Computer Vision
             'cv-train', 'cv-inference',
+            // Communication & APIs
+            'telegram', 'slack', 'discord', 'teams', 'email', 'sms', 'aws', 'github', 'stripe',
+            // Data
+            'postgresql', 'mongodb', 'mysql', 'redis', 'airtable',
             // Other
             'context-store',
         ].includes(n.type)
@@ -300,25 +304,23 @@ const ExecuteModal: React.FC<ExecuteModalProps> = ({ nodes, connections, onClose
                     >
                         {result ? 'Close' : 'Cancel'}
                     </button>
-                    {!result && (
-                        <button
-                            onClick={handleExecute}
-                            disabled={executing || !prompt.trim() || !hasAgentNode || !keyExists}
-                            className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25"
-                        >
-                            {executing ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Executing...
-                                </>
-                            ) : (
-                                <>
-                                    <Play className="w-4 h-4" fill="currentColor" />
-                                    Execute
-                                </>
-                            )}
-                        </button>
-                    )}
+                    <button
+                        onClick={handleExecute}
+                        disabled={executing || !prompt.trim() || !hasAgentNode || !keyExists}
+                        className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25"
+                    >
+                        {executing ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Executing...
+                            </>
+                        ) : (
+                            <>
+                                <Play className="w-4 h-4" fill="currentColor" />
+                                {result ? 'Run Again' : 'Execute'}
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </div>
