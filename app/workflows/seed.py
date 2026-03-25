@@ -11,10 +11,13 @@ NODE_TEMPLATES = [
     {"id": "email-trigger",   "name": "Email Trigger",      "icon": "📨",  "color": "from-pink-400 via-rose-400 to-red-500",         "category": "Triggers",         "description": "Trigger when a new email arrives"},
 
     # ── AI & ML ───────────────────────────────────
-    {"id": "openai",          "name": "OpenAI",             "icon": "🧠",  "color": "from-emerald-400 via-teal-400 to-cyan-500",     "category": "AI & ML",          "description": "Generate text with GPT models"},
+    {"id": "openai",          "name": "OpenAI (ChatGPT)",  "icon": "🧠",  "color": "from-emerald-400 via-teal-400 to-cyan-500",     "category": "AI & ML",          "description": "Generate text, chat, and images with OpenAI GPT & DALL-E models"},
     {"id": "anthropic",       "name": "Anthropic Claude",   "icon": "🤖",  "color": "from-orange-400 via-amber-400 to-yellow-500",   "category": "AI & ML",          "description": "Generate text with Claude models"},
     {"id": "huggingface",     "name": "HuggingFace",        "icon": "🤗",  "color": "from-yellow-400 via-orange-400 to-amber-500",   "category": "AI & ML",          "description": "Run inference on HuggingFace models"},
+    {"id": "gemini",          "name": "Google Gemini",      "icon": "✨",  "color": "from-blue-400 via-purple-400 to-pink-500",      "category": "AI & ML",          "description": "Generate content and chat with Google Gemini AI models"},
     {"id": "ai-agent",        "name": "AI Agent",           "icon": "👾",  "color": "from-purple-400 via-fuchsia-400 to-pink-500",   "category": "AI & ML",          "description": "Autonomous AI agent with tool use"},
+    {"id": "ml-trainer",      "name": "ML Trainer",         "icon": "🎯",  "color": "from-violet-400 via-purple-400 to-indigo-500",  "category": "AI & ML",          "description": "Train ML models and run predictions with scikit-learn"},
+    {"id": "context-store",   "name": "Context Store",      "icon": "📚",  "color": "from-amber-400 via-orange-400 to-red-500",      "category": "AI & ML",          "description": "Vector store for RAG - semantic search over documents"},
     {"id": "text-analysis",   "name": "Text Analysis",      "icon": "📝",  "color": "from-blue-400 via-cyan-400 to-teal-500",        "category": "AI & ML",          "description": "Sentiment, classification, NER and more"},
     {"id": "image-gen",       "name": "Image Generation",   "icon": "🎨",  "color": "from-pink-400 via-purple-400 to-indigo-500",    "category": "AI & ML",          "description": "Generate images from text prompts"},
 
@@ -25,9 +28,11 @@ NODE_TEMPLATES = [
     {"id": "telegram",        "name": "Telegram",           "icon": "✈️",  "color": "from-cyan-400 via-blue-400 to-indigo-500",      "category": "Communication",    "description": "Send Telegram messages and manage bots"},
     {"id": "email",           "name": "Email",              "icon": "📧",  "color": "from-red-400 via-pink-400 to-rose-500",         "category": "Communication",    "description": "Send emails via SMTP or API"},
     {"id": "sms",             "name": "SMS",                "icon": "💌",  "color": "from-green-400 via-emerald-400 to-teal-500",    "category": "Communication",    "description": "Send SMS via Twilio or similar"},
+    {"id": "twilio",          "name": "Twilio",             "icon": "📞",  "color": "from-purple-500 via-pink-500 to-fuchsia-600",   "category": "Communication",    "description": "Make phone calls and send SMS using Twilio"},
+    {"id": "elevenlabs",      "name": "ElevenLabs TTS",     "icon": "🔊",  "color": "from-indigo-500 via-purple-500 to-pink-600",    "category": "AI & ML",          "description": "Convert text to natural-sounding speech with ElevenLabs"},
 
     # ── Data & Storage ────────────────────────────
-    {"id": "postgresql",      "name": "PostgreSQL",         "icon": "🐘",  "color": "from-blue-500 via-indigo-500 to-blue-600",      "category": "Data & Storage",   "description": "Query and manage PostgreSQL databases"},
+    {"id": "postgresql",      "name": "PostgreSQL",         "icon": "🐘",  "color": "from-blue-500 via-indigo-500 to-blue-600",      "category": "Data & Storage",   "description": "Query and manage PostgreSQL databases with full SQL support"},
     {"id": "mongodb",         "name": "MongoDB",            "icon": "🍃",  "color": "from-green-500 via-emerald-500 to-teal-600",    "category": "Data & Storage",   "description": "Query and manage MongoDB collections"},
     {"id": "redis",           "name": "Redis",              "icon": "⚡",  "color": "from-red-500 via-orange-500 to-amber-600",      "category": "Data & Storage",   "description": "Read and write Redis keys"},
     {"id": "mysql",           "name": "MySQL",              "icon": "🐬",  "color": "from-blue-400 via-cyan-400 to-teal-500",        "category": "Data & Storage",   "description": "Query and manage MySQL databases"},
@@ -62,4 +67,11 @@ NODE_TEMPLATES = [
     {"id": "google-analytics","name": "Google Analytics",   "icon": "📈",  "color": "from-orange-400 via-red-400 to-pink-500",       "category": "Analytics",        "description": "Read Google Analytics data"},
     {"id": "mixpanel",        "name": "Mixpanel",           "icon": "📊",  "color": "from-purple-400 via-fuchsia-400 to-pink-500",   "category": "Analytics",        "description": "Send events and query Mixpanel data"},
     {"id": "segment",         "name": "Segment",            "icon": "🎯",  "color": "from-green-400 via-emerald-400 to-teal-500",    "category": "Analytics",        "description": "Track events and manage user data"},
+
+    # ── Google Workspace ────────────────────────────────
+    {"id": "google-docs",     "name": "Google Docs",        "icon": "📄",  "color": "from-blue-400 via-indigo-400 to-blue-600",     "category": "Google Workspace", "description": "Create, read, update, delete, and search Google Docs"},
+    {"id": "google-drive",    "name": "Google Drive",       "icon": "📁",  "color": "from-yellow-400 via-green-400 to-blue-500",    "category": "Google Workspace", "description": "List, upload, download, delete, and share files on Google Drive"},
+    {"id": "gmail",           "name": "Gmail",              "icon": "✉️",  "color": "from-red-400 via-red-500 to-rose-600",         "category": "Google Workspace", "description": "Send, read, search, and manage Gmail messages"},
+    {"id": "google-sheets",   "name": "Google Sheets",      "icon": "📊",  "color": "from-green-400 via-emerald-400 to-green-600",  "category": "Google Workspace", "description": "Create, read, write, and append data in Google Sheets","default_data": {}},
+    {"id": "google-forms",    "name": "Google Forms",       "icon": "📋",  "color": "from-purple-400 via-violet-400 to-purple-600", "category": "Google Workspace", "description": "Create forms, add questions, and collect responses"},
 ]

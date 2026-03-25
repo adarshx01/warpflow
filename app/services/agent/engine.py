@@ -1,0 +1,650 @@
+"""
+AI Agent workflow execution engine.
+
+Uses function-calling LLMs (Gemini or OpenAI) to orchestrate connected
+service tools based on the user's prompt and workflow configuration.
+"""
+
+import json
+import logging
+from typing import Any
+from uuid import UUID
+
+import httpx
+from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import User
+from app.services.google.common import get_user_credential, get_valid_access_token
+from app.services.agent.tools import TOOL_REGISTRY, CREDENTIAL_LESS_TOOLS
+
+logger = logging.getLogger(__name__)
+
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+OPENAI_API_BASE = "https://api.openai.com/v1"
+MAX_AGENT_ITERATIONS = 15
+
+SYSTEM_PROMPT = """You are an AI workflow automation agent. Execute the user's request by calling the available tools in the right order.
+
+IMPORTANT WORKFLOW GUIDELINES:
+
+For ML/Data tasks:
+1. CHECK NODE CONFIGURATIONS FIRST - If configurations are provided below, use those values directly (dataset_id, algorithm, hyperparameters, etc.)
+2. Only call ml_list_datasets if no dataset_id is configured
+3. Dataset IDs are UUIDs (like "653aba52-91ed-49b9-85b6-6e6a93ee56ae"), NOT filenames
+4. Column names are CASE-SENSITIVE (e.g., "Outcome" not "outcome")
+5. For predictions, call ml_list_models first to get model UUID and feature_names
+
+For CV (Computer Vision) tasks:
+1. CHECK NODE CONFIGURATIONS FIRST - Use configured values for task_type, model_name, dataset_path, epochs, etc.
+2. For training: Use the configured task_type (classification/detection/segmentation), model_name, dataset_path, and training parameters
+3. For inference: First call cv_load_model with configured task_type, model_name, and model_source, then call cv_infer
+4. If custom_model_name is configured, use it when saving the model
+5. For image inference: Use the configured image_url or image_path directly
+
+For Twilio (phone calls and SMS):
+1. For interactive voice conversations, ALWAYS prefer twilio_make_conversation_call over twilio_make_call
+2. twilio_make_conversation_call creates a real-time AI voice conversation with the person - they can talk back and forth naturally
+3. Provide a clear system_prompt telling the AI voice agent what to discuss, its personality, and goals
+4. Provide a warm first_message as the greeting when the person answers
+5. Use twilio_make_call ONLY for one-way announcements (no conversation needed)
+6. Use twilio_send_sms to send text messages - requires 'to', 'from', and 'body' parameters
+7. Phone numbers must be in E.164 format (e.g., +1234567890)
+8. Use twilio_get_call_status or twilio_get_message_status to check delivery status
+
+For ElevenLabs (text-to-speech):
+1. Use elevenlabs_list_voices first to get available voice IDs
+2. Use elevenlabs_text_to_speech to convert text to speech audio
+3. The audio is returned as base64-encoded data that can be played or saved
+
+For all tasks:
+- Use pre-configured values from node configurations when available
+- Think step by step about what actions are needed
+- Call tools in the correct sequence, using outputs from previous calls
+- After completing all actions, provide a clear summary including IDs, metrics, and results
+- If a tool returns an error, analyze the error message and retry with corrected parameters
+"""
+
+
+class WorkflowEngine:
+    """Executes a workflow using an AI agent to orchestrate connected services."""
+
+    def __init__(
+        self,
+        db: AsyncSession,
+        user: User,
+        nodes: list[dict[str, Any]],
+        connections: list[dict[str, Any]],
+        workflow_id: str = "inline",
+    ):
+        self.db = db
+        self.user = user
+        self._nodes = nodes
+        self._connections = connections
+        self._workflow_id = workflow_id
+        self._tool_map: dict[str, tuple[Any, str]] = {}
+        self._steps: list[dict] = []
+        self._node_configs: dict[str, dict[str, Any]] = {}
+
+    def _extract_node_configs(self, service_nodes: list[dict]) -> str:
+        """Extract configurations from service nodes and return formatted context."""
+        configs = []
+
+        for node in service_nodes:
+            node_type = node.get("type", "")
+            node_data = node.get("data", {})
+
+            # Skip if no relevant config data
+            if not node_data:
+                continue
+
+            config_info = {"node_type": node_type}
+
+            # Extract ML-related configurations
+            if node_type in ("unsupervised-train", "supervised-train", "data-prep", "model-inference"):
+                # Dataset configuration
+                if node_data.get("dataset_id"):
+                    config_info["dataset_id"] = node_data["dataset_id"]
+
+                # Algorithm configuration
+                if node_data.get("algorithm"):
+                    config_info["algorithm"] = node_data["algorithm"]
+
+                # Target column (for supervised)
+                if node_data.get("target_column"):
+                    config_info["target_column"] = node_data["target_column"]
+
+                # Feature columns
+                if node_data.get("feature_columns"):
+                    config_info["feature_columns"] = node_data["feature_columns"]
+
+                # Model name
+                if node_data.get("model_name"):
+                    config_info["model_name"] = node_data["model_name"]
+
+                # Hyperparameters
+                if node_data.get("hyperparameters"):
+                    config_info["hyperparameters"] = node_data["hyperparameters"]
+
+                # Preprocessing
+                if node_data.get("preprocessing"):
+                    config_info["preprocessing"] = node_data["preprocessing"]
+
+                # Task type (clustering, dimensionality_reduction, etc.)
+                if node_data.get("task_type"):
+                    config_info["task_type"] = node_data["task_type"]
+
+                # Model ID (for inference)
+                if node_data.get("model_id"):
+                    config_info["model_id"] = node_data["model_id"]
+
+            # Extract CV Training configurations
+            elif node_type == "cv-train":
+                # Task type (classification, detection, segmentation)
+                if node_data.get("task_type"):
+                    config_info["task_type"] = node_data["task_type"]
+
+                # Model architecture
+                if node_data.get("model_name"):
+                    config_info["model_name"] = node_data["model_name"]
+
+                # Dataset path
+                if node_data.get("dataset_path"):
+                    config_info["dataset_path"] = node_data["dataset_path"]
+
+                # Dataset format
+                if node_data.get("dataset_format"):
+                    config_info["dataset_format"] = node_data["dataset_format"]
+
+                # Training parameters
+                if node_data.get("epochs"):
+                    config_info["epochs"] = node_data["epochs"]
+                if node_data.get("batch_size"):
+                    config_info["batch_size"] = node_data["batch_size"]
+                if node_data.get("learning_rate"):
+                    config_info["learning_rate"] = node_data["learning_rate"]
+                if node_data.get("optimizer"):
+                    config_info["optimizer"] = node_data["optimizer"]
+                if node_data.get("image_size"):
+                    config_info["image_size"] = node_data["image_size"]
+
+                # Data split
+                if node_data.get("train_pct"):
+                    config_info["train_pct"] = node_data["train_pct"]
+                if node_data.get("val_pct"):
+                    config_info["val_pct"] = node_data["val_pct"]
+                if node_data.get("test_pct"):
+                    config_info["test_pct"] = node_data["test_pct"]
+
+                # Save options
+                if node_data.get("save_local") is not None:
+                    config_info["save_local"] = node_data["save_local"]
+                if node_data.get("upload_to_s3") is not None:
+                    config_info["upload_to_s3"] = node_data["upload_to_s3"]
+                if node_data.get("s3_model_path"):
+                    config_info["s3_model_path"] = node_data["s3_model_path"]
+                if node_data.get("custom_model_name"):
+                    config_info["custom_model_name"] = node_data["custom_model_name"]
+
+            # Extract CV Inference configurations
+            elif node_type == "cv-inference":
+                # Task type
+                if node_data.get("task_type"):
+                    config_info["task_type"] = node_data["task_type"]
+
+                # Model architecture
+                if node_data.get("model_name"):
+                    config_info["model_name"] = node_data["model_name"]
+
+                # Model source and paths
+                if node_data.get("model_source"):
+                    config_info["model_source"] = node_data["model_source"]
+                if node_data.get("model_path"):
+                    config_info["model_path"] = node_data["model_path"]
+                if node_data.get("s3_model_path"):
+                    config_info["s3_model_path"] = node_data["s3_model_path"]
+                if node_data.get("selected_saved_model"):
+                    config_info["selected_saved_model"] = node_data["selected_saved_model"]
+
+                # Input configuration
+                if node_data.get("input_type"):
+                    config_info["input_type"] = node_data["input_type"]
+                if node_data.get("image_path"):
+                    config_info["image_path"] = node_data["image_path"]
+                if node_data.get("image_url"):
+                    config_info["image_url"] = node_data["image_url"]
+
+                # Model parameters
+                if node_data.get("num_classes"):
+                    config_info["num_classes"] = node_data["num_classes"]
+                if node_data.get("dataset_path"):
+                    config_info["dataset_path"] = node_data["dataset_path"]
+                if node_data.get("confidence_threshold"):
+                    config_info["confidence_threshold"] = node_data["confidence_threshold"]
+
+            # Extract Telegram configurations
+            elif node_type == "telegram":
+                if node_data.get("defaultChatId"):
+                    config_info["defaultChatId"] = node_data["defaultChatId"]
+
+            # Extract Slack configurations
+            elif node_type == "slack":
+                if node_data.get("defaultChannel"):
+                    config_info["defaultChannel"] = node_data["defaultChannel"]
+
+            # Only add if we have actual config values beyond just node_type
+            if len(config_info) > 1:
+                self._node_configs[node_type] = config_info
+                configs.append(config_info)
+
+        if not configs:
+            return ""
+
+        config_text = "\n\nNODE CONFIGURATIONS (use these values directly):\n"
+        for cfg in configs:
+            config_text += f"\n{cfg['node_type'].upper()} Node:\n"
+            for key, value in cfg.items():
+                if key != "node_type":
+                    config_text += f"  - {key}: {json.dumps(value) if isinstance(value, (dict, list)) else value}\n"
+
+        return config_text
+
+    async def execute(
+        self,
+        prompt: str,
+        ai_provider: str,
+        ai_api_key: str,
+        ai_model: str | None = None,
+    ) -> dict:
+        """Execute the workflow with the given prompt using AI orchestration."""
+        nodes = self._nodes
+        connections = self._connections
+
+        # Build bidirectional adjacency (handle both from/to and sourceId/targetId)
+        neighbors: dict[str, set[str]] = {n["id"]: set() for n in nodes}
+        for conn in connections:
+            src = conn.get("from") or conn.get("sourceId", "")
+            tgt = conn.get("to") or conn.get("targetId", "")
+            if src in neighbors:
+                neighbors[src].add(tgt)
+            if tgt in neighbors:
+                neighbors[tgt].add(src)
+
+        # Find the AI agent node
+        agent_node = next((n for n in nodes if n.get("type") == "ai-agent"), None)
+        if not agent_node:
+            raise HTTPException(status_code=400, detail="No AI Agent node found in workflow")
+
+        # Collect service nodes connected to the agent
+        connected_ids = neighbors.get(agent_node["id"], set())
+        service_nodes = [
+            n for n in nodes
+            if n["id"] in connected_ids and n.get("type") != "ai-agent"
+        ]
+
+        if not service_nodes:
+            raise HTTPException(
+                status_code=400,
+                detail="No service nodes connected to the AI Agent",
+            )
+
+        # Extract node configurations before registering tools
+        node_config_context = self._extract_node_configs(service_nodes)
+
+        # Register tools from connected service nodes
+        await self._register_tools(service_nodes)
+
+        if not self._tool_map:
+            raise HTTPException(
+                status_code=400,
+                detail="No valid tools could be loaded from the connected service nodes. "
+                       "Ensure the service nodes have valid credentials configured.",
+            )
+
+        # Enhance prompt with node configurations
+        enhanced_prompt = prompt
+        if node_config_context:
+            enhanced_prompt = f"{prompt}{node_config_context}"
+
+        # Run the agent loop
+        if ai_provider == "openai":
+            summary = await self._run_openai_agent(
+                enhanced_prompt, ai_api_key, ai_model or "gpt-4o",
+            )
+        else:
+            summary = await self._run_gemini_agent(
+                enhanced_prompt, ai_api_key, ai_model or "gemini-2.5-flash",
+            )
+
+        return {
+            "workflow_id": self._workflow_id,
+            "status": "completed",
+            "summary": summary,
+            "steps": self._steps,
+        }
+
+    # ─── Tool Registration ────────────────────
+
+    async def _register_tools(self, service_nodes: list[dict]) -> None:
+        """Register tools from connected service nodes, resolving credentials."""
+        registered_types: set[str] = set()
+
+        print(f"[DEBUG] Registering tools for {len(service_nodes)} service nodes")
+        print(f"[DEBUG] Service nodes: {[n.get('type') for n in service_nodes]}")
+        print(f"[DEBUG] TOOL_REGISTRY keys: {list(TOOL_REGISTRY.keys())}")
+        print(f"[DEBUG] CREDENTIAL_LESS_TOOLS: {CREDENTIAL_LESS_TOOLS}")
+        logger.info("Registering tools for %d service nodes", len(service_nodes))
+        logger.info("Available TOOL_REGISTRY keys: %s", list(TOOL_REGISTRY.keys()))
+        logger.info("CREDENTIAL_LESS_TOOLS: %s", CREDENTIAL_LESS_TOOLS)
+
+        for node in service_nodes:
+            node_type = node.get("type", "")
+            print(f"[DEBUG] Processing node type: '{node_type}'")
+            logger.info("Processing node type: '%s'", node_type)
+
+            if node_type in registered_types:
+                print(f"[DEBUG] Skipping '{node_type}' - already registered")
+                logger.info("Skipping '%s' - already registered", node_type)
+                continue
+
+            if node_type not in TOOL_REGISTRY:
+                print(f"[DEBUG] Node type '{node_type}' NOT in TOOL_REGISTRY")
+                logger.warning("Node type '%s' not found in TOOL_REGISTRY", node_type)
+                continue
+
+            # Handle credential-less tools (ML, Context Store, Twilio, ElevenLabs, etc.)
+            if node_type in CREDENTIAL_LESS_TOOLS:
+                print(f"[DEBUG] '{node_type}' is in CREDENTIAL_LESS_TOOLS")
+                for tool_def in TOOL_REGISTRY[node_type]:
+                    # Pass user_id instead of OAuth token, and db session
+                    self._tool_map[tool_def["name"]] = (tool_def["_fn"], str(self.user.id))
+                    print(f"[DEBUG] Registered tool: {tool_def['name']}")
+                    logger.info("Registered tool: %s", tool_def["name"])
+                registered_types.add(node_type)
+                continue
+
+            node_data = node.get("data", {})
+            
+            # Nodes like Telegram and Slack store their bot token directly in the node configuration
+            direct_token = node_data.get("botToken") or node_data.get("apiKey") or node_data.get("token")
+            if direct_token:
+                for tool_def in TOOL_REGISTRY[node_type]:
+                    self._tool_map[tool_def["name"]] = (tool_def["_fn"], direct_token)
+                registered_types.add(node_type)
+                continue
+
+            credential_id = node_data.get("credentialId")
+
+            if not credential_id:
+                logger.warning(
+                    "Node %s (%s) has no credentialId or botToken configured, skipping",
+                    node.get("id"), node_type,
+                )
+                continue
+
+            try:
+                credential = await get_user_credential(
+                    self.db, UUID(str(credential_id)), self.user.id,
+                )
+                token = await get_valid_access_token(credential, self.db)
+            except Exception as exc:
+                logger.warning("Failed to get token for %s: %s", node_type, exc)
+                continue
+
+            for tool_def in TOOL_REGISTRY[node_type]:
+                self._tool_map[tool_def["name"]] = (tool_def["_fn"], token)
+
+            registered_types.add(node_type)
+
+    def _get_tool_definitions(self) -> list[dict]:
+        """Return tool definitions for only the registered (available) tools."""
+        defs = []
+        seen: set[str] = set()
+        print(f"[DEBUG] Building tool definitions. tool_map keys: {list(self._tool_map.keys())}")
+        logger.info("Building tool definitions. tool_map contains: %s", list(self._tool_map.keys()))
+        for service_tools in TOOL_REGISTRY.values():
+            for tool in service_tools:
+                name = tool["name"]
+                if name in self._tool_map and name not in seen:
+                    defs.append({
+                        "name": name,
+                        "description": tool["description"],
+                        "parameters": tool["parameters"],
+                    })
+                    seen.add(name)
+        print(f"[DEBUG] Final tool definitions: {[d['name'] for d in defs]}")
+        logger.info("Final tool definitions count: %d, tools: %s", len(defs), [d["name"] for d in defs])
+        return defs
+
+    async def _execute_tool(self, tool_name: str, args: dict) -> dict:
+        """Execute a registered tool and record the step."""
+        if tool_name not in self._tool_map:
+            error_msg = f"Unknown tool: {tool_name}"
+            self._steps.append({"tool": tool_name, "params": args, "error": error_msg})
+            return {"error": error_msg}
+
+        fn, token = self._tool_map[tool_name]
+        try:
+            # Credential-less tools (ML, Context, CV, Twilio, ElevenLabs, PostgreSQL) need db session
+            if tool_name.startswith("ml_") or tool_name.startswith("context_"):
+                result = await fn(token, args, self.db)
+            elif tool_name.startswith("cv_"):
+                # CV tools take (user_id, params) - no db session needed
+                result = await fn(token, args)
+            elif tool_name.startswith("twilio_") or tool_name.startswith("elevenlabs_") or tool_name.startswith("postgres_") or tool_name.startswith("call_conversation_"):
+                # Secret-based tools need db session to fetch credentials
+                result = await fn(token, args, self.db)
+            else:
+                result = await fn(token, args)
+            self._steps.append({"tool": tool_name, "params": args, "result": result})
+            return result
+        except HTTPException as exc:
+            error_msg = str(exc.detail)
+            self._steps.append({"tool": tool_name, "params": args, "error": error_msg})
+            return {"error": error_msg}
+        except Exception as exc:
+            error_msg = str(exc)
+            self._steps.append({"tool": tool_name, "params": args, "error": error_msg})
+            return {"error": error_msg}
+
+    # ─── Gemini Agent Loop ────────────────────
+
+    async def _run_gemini_agent(self, prompt: str, api_key: str, model: str) -> str:
+        """Run the agent loop using Gemini function calling."""
+        tool_defs = self._get_tool_definitions()
+
+        print(f"[DEBUG] Sending {len(tool_defs)} tools to Gemini: {[t['name'] for t in tool_defs]}")
+        logger.info("Sending %d tools to Gemini: %s", len(tool_defs), [t["name"] for t in tool_defs])
+
+        gemini_tools = [{
+            "functionDeclarations": [
+                {
+                    "name": t["name"],
+                    "description": t["description"],
+                    "parameters": _to_gemini_schema(t["parameters"]),
+                }
+                for t in tool_defs
+            ]
+        }]
+
+        if not tool_defs:
+            print("[DEBUG] WARNING: No tools available for Gemini!")
+            return "Error: No tools are available. Please ensure service nodes are properly connected to the AI Agent."
+
+        contents: list[dict[str, Any]] = [
+            {"role": "user", "parts": [{"text": prompt}]},
+        ]
+
+        for _ in range(MAX_AGENT_ITERATIONS):
+            body: dict[str, Any] = {
+                "contents": contents,
+                "tools": gemini_tools,
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": 4096,
+                },
+                "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            }
+
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                try:
+                    resp = await client.post(
+                        f"{GEMINI_API_BASE}/{model}:generateContent",
+                        params={"key": api_key},
+                        headers={"Content-Type": "application/json"},
+                        json=body,
+                    )
+                    resp.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    try:
+                        detail = exc.response.json()
+                    except Exception:
+                        detail = exc.response.text
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Gemini API error: {detail}",
+                    )
+
+            data = resp.json()
+            candidates = data.get("candidates", [])
+            if not candidates:
+                return "No response from Gemini model."
+
+            parts = candidates[0].get("content", {}).get("parts", [])
+
+            # Check for function calls
+            function_calls = [p for p in parts if "functionCall" in p]
+
+            if not function_calls:
+                # Final text response
+                text = "".join(p.get("text", "") for p in parts if "text" in p)
+                return text or "Task completed."
+
+            # Append model response to conversation
+            contents.append({"role": "model", "parts": parts})
+
+            # Execute each function call and build responses
+            response_parts: list[dict] = []
+            for fc_part in function_calls:
+                fc = fc_part["functionCall"]
+                result = await self._execute_tool(fc["name"], fc.get("args", {}))
+                response_parts.append({
+                    "functionResponse": {
+                        "name": fc["name"],
+                        "response": {"content": result},
+                    }
+                })
+
+            contents.append({"role": "user", "parts": response_parts})
+
+        return "Agent reached maximum iterations. Check steps for partial results."
+
+    # ─── OpenAI Agent Loop ────────────────────
+
+    async def _run_openai_agent(self, prompt: str, api_key: str, model: str) -> str:
+        """Run the agent loop using OpenAI function calling."""
+        tool_defs = self._get_tool_definitions()
+
+        openai_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t["description"],
+                    "parameters": t["parameters"],
+                },
+            }
+            for t in tool_defs
+        ]
+
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
+
+        for _ in range(MAX_AGENT_ITERATIONS):
+            body = {
+                "model": model,
+                "messages": messages,
+                "tools": openai_tools,
+                "temperature": 0.2,
+                "max_tokens": 4096,
+            }
+
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                try:
+                    resp = await client.post(
+                        f"{OPENAI_API_BASE}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=body,
+                    )
+                    resp.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    try:
+                        detail = exc.response.json()
+                    except Exception:
+                        detail = exc.response.text
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"OpenAI API error: {detail}",
+                    )
+
+            data = resp.json()
+            choice = data.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            finish_reason = choice.get("finish_reason")
+
+            tool_calls = message.get("tool_calls", [])
+
+            if not tool_calls or finish_reason == "stop":
+                return message.get("content") or "Task completed."
+
+            # Append the assistant message (with tool_calls) to conversation
+            messages.append(message)
+
+            # Execute tool calls and append results
+            for tc in tool_calls:
+                fn_info = tc.get("function", {})
+                tool_name = fn_info.get("name", "")
+                try:
+                    tool_args = json.loads(fn_info.get("arguments", "{}"))
+                except json.JSONDecodeError:
+                    tool_args = {}
+
+                result = await self._execute_tool(tool_name, tool_args)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": json.dumps(result, default=str),
+                })
+
+        return "Agent reached maximum iterations. Check steps for partial results."
+
+
+# ─── Helpers ──────────────────────────────────
+
+_TYPE_MAP = {
+    "object": "OBJECT",
+    "string": "STRING",
+    "integer": "INTEGER",
+    "number": "NUMBER",
+    "boolean": "BOOLEAN",
+    "array": "ARRAY",
+}
+
+
+def _to_gemini_schema(schema: dict) -> dict:
+    """Convert standard JSON Schema to Gemini's parameter format (uppercase types)."""
+    result = dict(schema)
+    if "type" in result:
+        result["type"] = _TYPE_MAP.get(result["type"], result["type"])
+    if "properties" in result:
+        result["properties"] = {
+            k: _to_gemini_schema(v) for k, v in result["properties"].items()
+        }
+    if "items" in result:
+        result["items"] = _to_gemini_schema(result["items"])
+    return result

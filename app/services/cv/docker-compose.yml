@@ -1,0 +1,77 @@
+# CV Service Docker Compose Configuration
+# Unified microservice for Computer Vision training and inference
+
+version: "3.8"
+
+services:
+  # ─── CPU-only CV Service ────────────────────────────────────────────────────
+  cv-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: cv-service
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist saved models
+      - cv-models:/app/saved_models
+      # Mount dataset directory (adjust path as needed)
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CV_MODEL_BASE_PATH=/app/saved_models
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cv-network
+
+  # ─── GPU-enabled CV Service (NVIDIA) ────────────────────────────────────────
+  cv-service-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: gpu
+    container_name: cv-service-gpu
+    ports:
+      - "8080:8080"
+    volumes:
+      - cv-models:/app/saved_models
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CV_MODEL_BASE_PATH=/app/saved_models
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - cv-network
+    profiles:
+      - gpu  # Only start with: docker-compose --profile gpu up
+
+volumes:
+  cv-models:
+    name: cv-service-models
+
+networks:
+  cv-network:
+    name: cv-service-network
+    driver: bridge
