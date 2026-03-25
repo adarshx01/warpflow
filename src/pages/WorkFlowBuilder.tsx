@@ -37,17 +37,12 @@ const nodeTypes: NodeType[] = [
   { id: 'schedule', name: 'Schedule', icon: '⏰', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Triggers' },
   { id: 'webhook', name: 'Webhook', icon: '🔗', color: 'from-cyan-400 via-teal-400 to-green-500', category: 'Triggers' },
   { id: 'email-trigger', name: 'Email Trigger', icon: '📨', color: 'from-pink-400 via-rose-400 to-red-500', category: 'Triggers' },
-  { id: 'news-trigger', name: 'News Trigger', icon: '📰', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Triggers' },
 
   // AI & ML
   { id: 'openai', name: 'OpenAI (ChatGPT)', icon: '🧠', color: 'from-emerald-400 via-teal-400 to-cyan-500', category: 'AI & ML' },
   { id: 'gemini', name: 'Google Gemini', icon: '✨', color: 'from-blue-400 via-violet-400 to-purple-500', category: 'AI & ML' },
-  { id: 'anthropic', name: 'Anthropic Claude', icon: '🤖', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'AI & ML' },
-  { id: 'huggingface', name: 'HuggingFace', icon: '🤗', color: 'from-yellow-400 via-orange-400 to-amber-500', category: 'AI & ML' },
   { id: 'ai-agent', name: 'AI Agent', icon: '👾', color: 'from-purple-400 via-fuchsia-400 to-pink-500', category: 'AI & ML' },
   { id: 'context-store', name: 'Context Store', icon: '📚', color: 'from-amber-400 via-orange-400 to-red-500', category: 'AI & ML' },
-  { id: 'text-analysis', name: 'Text Analysis', icon: '📝', color: 'from-blue-400 via-cyan-400 to-teal-500', category: 'AI & ML' },
-  { id: 'image-gen', name: 'Image Generation', icon: '🎨', color: 'from-pink-400 via-purple-400 to-indigo-500', category: 'AI & ML' },
   { id: 'elevenlabs', name: 'ElevenLabs TTS', icon: '🔊', color: 'from-indigo-500 via-purple-500 to-pink-600', category: 'AI & ML' },
 
   // ML Training & Inference
@@ -62,53 +57,19 @@ const nodeTypes: NodeType[] = [
 
   // Communication
   { id: 'slack', name: 'Slack', icon: '💬', color: 'from-purple-400 via-pink-400 to-rose-500', category: 'Communication' },
-  { id: 'discord', name: 'Discord', icon: '🎮', color: 'from-indigo-400 via-purple-400 to-pink-500', category: 'Communication' },
-  { id: 'teams', name: 'Microsoft Teams', icon: '👥', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Communication' },
   { id: 'telegram', name: 'Telegram', icon: '✈️', color: 'from-cyan-400 via-blue-400 to-indigo-500', category: 'Communication' },
-  { id: 'email', name: 'Email', icon: '📧', color: 'from-red-400 via-pink-400 to-rose-500', category: 'Communication' },
-  { id: 'sms', name: 'SMS', icon: '💌', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'Communication' },
   { id: 'twilio', name: 'Twilio', icon: '📞', color: 'from-purple-500 via-pink-500 to-fuchsia-600', category: 'Communication' },
 
   // Data & Storage
   { id: 'postgresql', name: 'PostgreSQL', icon: '🐘', color: 'from-blue-500 via-indigo-500 to-blue-600', category: 'Data & Storage' },
-  { id: 'mongodb', name: 'MongoDB', icon: '🍃', color: 'from-green-500 via-emerald-500 to-teal-600', category: 'Data & Storage' },
-  { id: 'redis', name: 'Redis', icon: '⚡', color: 'from-red-500 via-orange-500 to-amber-600', category: 'Data & Storage' },
-  { id: 'mysql', name: 'MySQL', icon: '🐬', color: 'from-blue-400 via-cyan-400 to-teal-500', category: 'Data & Storage' },
-  { id: 'google-sheets', name: 'Google Sheets', icon: '📊', color: 'from-green-400 via-emerald-400 to-green-500', category: 'Google Workspace' },
-  { id: 'airtable', name: 'Airtable', icon: '📋', color: 'from-yellow-400 via-orange-400 to-red-500', category: 'Data & Storage' },
-  { id: 'csv', name: 'CSV', icon: '📄', color: 'from-slate-400 via-gray-400 to-zinc-500', category: 'Data & Storage' },
 
-  // Logic & Flow
-  { id: 'if-condition', name: 'IF Condition', icon: '🔀', color: 'from-amber-400 via-orange-400 to-red-500', category: 'Logic & Flow' },
-  { id: 'switch', name: 'Switch', icon: '🔄', color: 'from-purple-400 via-violet-400 to-indigo-500', category: 'Logic & Flow' },
-  { id: 'loop', name: 'Loop', icon: '🔁', color: 'from-cyan-400 via-blue-400 to-indigo-500', category: 'Logic & Flow' },
-  { id: 'merge', name: 'Merge', icon: '🔗', color: 'from-green-400 via-teal-400 to-cyan-500', category: 'Logic & Flow' },
-  { id: 'split', name: 'Split', icon: '✂️', color: 'from-pink-400 via-rose-400 to-red-500', category: 'Logic & Flow' },
-  { id: 'wait', name: 'Wait', icon: '⏸️', color: 'from-blue-400 via-indigo-400 to-purple-500', category: 'Logic & Flow' },
-
-  // Data Processing
-  { id: 'transform', name: 'Transform Data', icon: '⚙️', color: 'from-teal-400 via-cyan-400 to-blue-500', category: 'Data Processing' },
-  { id: 'filter', name: 'Filter', icon: '🔍', color: 'from-indigo-400 via-purple-400 to-pink-500', category: 'Data Processing' },
-  { id: 'aggregate', name: 'Aggregate', icon: '📊', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'Data Processing' },
-  { id: 'sort', name: 'Sort', icon: '↕️', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'Data Processing' },
-  { id: 'json', name: 'JSON', icon: '{ }', color: 'from-yellow-400 via-amber-400 to-orange-500', category: 'Data Processing' },
-
-  // APIs & Services
-  { id: 'http', name: 'HTTP Request', icon: '🌐', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'APIs & Services' },
-  { id: 'rest-api', name: 'REST API', icon: '🔌', color: 'from-blue-400 via-cyan-400 to-teal-500', category: 'APIs & Services' },
-  { id: 'graphql', name: 'GraphQL', icon: '◆', color: 'from-pink-400 via-fuchsia-400 to-purple-500', category: 'APIs & Services' },
-  { id: 'stripe', name: 'Stripe', icon: '💳', color: 'from-indigo-400 via-purple-400 to-violet-500', category: 'APIs & Services' },
-  { id: 'github', name: 'GitHub', icon: '🐙', color: 'from-slate-500 via-gray-500 to-zinc-600', category: 'APIs & Services' },
-  { id: 'aws', name: 'AWS', icon: '☁️', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'APIs & Services' },
-
-  // Analytics
-  { id: 'google-analytics', name: 'Google Analytics', icon: '📈', color: 'from-orange-400 via-red-400 to-pink-500', category: 'Analytics' },
-  { id: 'mixpanel', name: 'Mixpanel', icon: '📊', color: 'from-purple-400 via-fuchsia-400 to-pink-500', category: 'Analytics' },
-  { id: 'segment', name: 'Segment', icon: '🎯', color: 'from-green-400 via-emerald-400 to-teal-500', category: 'Analytics' },
+  // Cloud
+  { id: 'aws', name: 'AWS S3', icon: '☁️', color: 'from-orange-400 via-amber-400 to-yellow-500', category: 'Cloud' },
 
   // Google Workspace
   { id: 'google-docs', name: 'Google Docs', icon: '📄', color: 'from-blue-400 via-indigo-400 to-blue-600', category: 'Google Workspace' },
   { id: 'google-drive', name: 'Google Drive', icon: '📁', color: 'from-yellow-400 via-green-400 to-green-600', category: 'Google Workspace' },
+  { id: 'google-sheets', name: 'Google Sheets', icon: '📊', color: 'from-green-400 via-emerald-400 to-green-500', category: 'Google Workspace' },
   { id: 'gmail', name: 'Gmail', icon: '✉️', color: 'from-red-400 via-yellow-400 to-green-500', category: 'Google Workspace' },
   { id: 'google-forms', name: 'Google Forms', icon: '📝', color: 'from-purple-400 via-indigo-400 to-blue-500', category: 'Google Workspace' },
 ];
@@ -359,7 +320,7 @@ const WorkflowBuilder = () => {
 
   // Detect which background trigger nodes are present
   const hasTriggerNode = nodes.some(n =>
-    ['news-trigger', 'email-trigger', 'schedule', 'webhook'].includes(n.type)
+    ['email-trigger', 'schedule', 'webhook'].includes(n.type)
   );
 
   const saveWorkflow = async () => {

@@ -26,7 +26,6 @@ import ManualTriggerConfig from './nodes/ManualTriggerConfig';
 import ScheduleConfig from './nodes/ScheduleConfig';
 import WebhookConfig from './nodes/WebhookConfig';
 import EmailTriggerConfig from './nodes/EmailTriggerConfig';
-import NewsTriggerConfig from './nodes/NewsTriggerConfig';
 // Communication nodes
 import SlackConfig from './nodes/SlackConfig';
 import TelegramConfig from './nodes/TelegramConfig';
@@ -102,8 +101,6 @@ const NodeConfigModal: React.FC<NodeConfigModalProps> = ({ node, onClose, onSave
                 return <WebhookConfig initialData={node.data} onSave={handleSave} nodeId={node.id} />;
             case 'email-trigger':
                 return <EmailTriggerConfig initialData={node.data} onSave={handleSave} />;
-            case 'news-trigger':
-                return <NewsTriggerConfig initialData={node.data} onSave={handleSave} />;
             // Communication nodes
             case 'slack':
                 return <SlackConfig initialData={node.data} onSave={handleSave} />;

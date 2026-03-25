@@ -2,44 +2,22 @@ import React from 'react';
 import { 
   FaTelegramPlane, 
   FaSlack, 
-  FaDiscord, 
-  FaGithub, 
-  FaStripe, 
-  FaAws,
-  FaUsers
+  FaAws
 } from 'react-icons/fa';
 import { 
   SiGoogle, 
   SiGoogledrive, 
   SiGooglesheets, 
   SiPostgresql, 
-  SiMongodb, 
-  SiMysql, 
-  SiRedis, 
   SiOpenai, 
-  SiAirtable, 
   SiGoogleforms, 
-  SiGoogledocs,
-  SiAnthropic,
-  SiHuggingface
+  SiGoogledocs
 } from 'react-icons/si';
 import { 
   MdOutlineEmail, 
-  MdSms, 
   MdWebhook, 
   MdAccessTime, 
-  MdTouchApp, 
-  MdArticle, 
-  MdDataObject,
-  MdFilterAlt,
-  MdTransform,
-  MdSort,
-  MdBarChart,
-  MdLoop,
-  MdCallSplit,
-  MdCallMerge,
-  MdPauseCircleOutline,
-  MdAltRoute,
+  MdTouchApp,
   MdNetworkCheck
 } from 'react-icons/md';
 import { 
@@ -48,8 +26,7 @@ import {
   TbReportAnalytics, 
   TbBrain, 
   TbEye, 
-  TbTargetArrow,
-  TbWand
+  TbTargetArrow
 } from 'react-icons/tb';
 
 interface NodeIconProps {
@@ -63,10 +40,6 @@ const customIconMap: Record<string, React.ElementType> = {
   // Communication
   'telegram': FaTelegramPlane,
   'slack': FaSlack,
-  'discord': FaDiscord,
-  'teams': FaUsers,
-  'email': MdOutlineEmail,
-  'sms': MdSms,
 
   // Google Workspace
   'google-drive': SiGoogledrive,
@@ -80,16 +53,12 @@ const customIconMap: Record<string, React.ElementType> = {
   'schedule': MdAccessTime,
   'webhook': MdWebhook,
   'email-trigger': MdOutlineEmail,
-  'news-trigger': MdArticle,
 
   // AI & ML
   'openai': SiOpenai,
   'gemini': SiGoogle,
-  'anthropic': SiAnthropic,
-  'huggingface': SiHuggingface,
   'ai-agent': TbRobot,
   'context-store': TbBooks,
-  'image-gen': TbWand,
 
   // ML & CV
   'data-prep': TbReportAnalytics,
@@ -101,29 +70,8 @@ const customIconMap: Record<string, React.ElementType> = {
 
   // Data
   'postgresql': SiPostgresql,
-  'mongodb': SiMongodb,
-  'redis': SiRedis,
-  'mysql': SiMysql,
-  'airtable': SiAirtable,
-
-  // Processing & Logic
-  'transform': MdTransform,
-  'filter': MdFilterAlt,
-  'aggregate': MdBarChart,
-  'sort': MdSort,
-  'json': MdDataObject,
-  'if-condition': MdAltRoute,
-  'switch': MdAltRoute,
-  'loop': MdLoop,
-  'split': MdCallSplit,
-  'merge': MdCallMerge,
-  'wait': MdPauseCircleOutline,
 
   // APIs
-  'http': MdNetworkCheck,
-  'rest-api': MdNetworkCheck,
-  'github': FaGithub,
-  'stripe': FaStripe,
   'aws': FaAws,
 };
 
