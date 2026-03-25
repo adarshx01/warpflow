@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Play, Trash2, ZoomIn, ZoomOut, Maximize2, Save, Download, Search, ChevronDown, Grid, Settings, Copy, LogOut, PanelLeftClose, PanelLeftOpen, Power, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Plus, Play, Trash2, ZoomIn, ZoomOut, Maximize2, Save, Download, Upload, Search, ChevronDown, Grid, Settings, Copy, LogOut, PanelLeftClose, PanelLeftOpen, Power, Loader2, FolderOpen } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import NodeConfigModal from '../components/NodeConfigModal';
 import ExecuteModal from '../components/ExecuteModal';
 import { NodeIcon } from '../components/nodes/NodeIcon';
+import WorkflowSelector from '../components/WorkflowSelector';
 
 interface NodeType {
   id: string;
@@ -91,13 +92,17 @@ const WorkflowBuilder = () => {
   const [configNode, setConfigNode] = useState<Node | null>(null);
   const [showExecuteModal, setShowExecuteModal] = useState(false);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
+  const [workflowName, setWorkflowName] = useState<string>('Untitled Workflow');
   const [isActive, setIsActive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [showWorkflowSelector, setShowWorkflowSelector] = useState(false);
+  const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const categories = ['All', ...new Set(nodeTypes.map(n => n.category))];
 
@@ -106,6 +111,120 @@ const WorkflowBuilder = () => {
     const matchesCategory = selectedCategory === 'All' || node.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // Load workflow by ID
+  const loadWorkflow = useCallback(async (id: string) => {
+    setIsLoadingWorkflow(true);
+    try {
+      const workflow = await api<{
+        id: string;
+        name: string;
+        is_active: boolean;
+        nodes: Node[];
+        connections: Connection[];
+        viewport?: { zoom: number; pan: { x: number; y: number } };
+      }>(`/api/workflows/${id}`);
+
+      setWorkflowId(workflow.id);
+      setWorkflowName(workflow.name);
+      setNodes(workflow.nodes || []);
+      setConnections(workflow.connections || []);
+      setIsActive(workflow.is_active);
+
+      if (workflow.viewport) {
+        setZoom(workflow.viewport.zoom || 1);
+        setPan(workflow.viewport.pan || { x: 0, y: 0 });
+      }
+
+      // Update URL
+      setSearchParams({ id: workflow.id });
+      setSaveStatus('Loaded!');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch (err) {
+      console.error('Failed to load workflow:', err);
+      setSaveStatus('Load failed');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } finally {
+      setIsLoadingWorkflow(false);
+    }
+  }, [setSearchParams]);
+
+  // Load workflow from URL on mount
+  useEffect(() => {
+    const workflowIdParam = searchParams.get('id');
+    if (workflowIdParam && !workflowId) {
+      loadWorkflow(workflowIdParam);
+    }
+  }, [searchParams, workflowId, loadWorkflow]);
+
+  // Export workflow to JSON file
+  const exportWorkflow = () => {
+    const workflowData = {
+      name: workflowName,
+      nodes,
+      connections,
+      viewport: { zoom, pan },
+      exportedAt: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(workflowData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflowName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSaveStatus('Exported!');
+    setTimeout(() => setSaveStatus(null), 2000);
+  };
+
+  // Import workflow from JSON file
+  const importWorkflow = async (file: File) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!data.nodes || !Array.isArray(data.nodes)) {
+        throw new Error('Invalid workflow file: missing nodes');
+      }
+
+      // Reset current workflow
+      setWorkflowId(null);
+      setWorkflowName(data.name || 'Imported Workflow');
+      setNodes(data.nodes);
+      setConnections(data.connections || []);
+
+      if (data.viewport) {
+        setZoom(data.viewport.zoom || 1);
+        setPan(data.viewport.pan || { x: 0, y: 0 });
+      }
+
+      setIsActive(false);
+      setSearchParams({});
+
+      setSaveStatus('Imported!');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch (err) {
+      console.error('Failed to import workflow:', err);
+      setSaveStatus('Import failed');
+      setTimeout(() => setSaveStatus(null), 2000);
+    }
+  };
+
+  // Create new workflow
+  const newWorkflow = () => {
+    setWorkflowId(null);
+    setWorkflowName('Untitled Workflow');
+    setNodes([]);
+    setConnections([]);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setIsActive(false);
+    setSearchParams({});
+  };
 
   const handleDragStart = (e: React.DragEvent, type: string) => {
     e.dataTransfer.setData('application/reactflow', type);
@@ -328,7 +447,8 @@ const WorkflowBuilder = () => {
     setIsSaving(true);
     setSaveStatus(null);
     try {
-      const payload = { nodes, connections };
+      const viewport = { zoom, pan };
+      const payload = { name: workflowName, nodes, connections, viewport };
       if (workflowId) {
         await api(`/api/workflows/${workflowId}`, {
           method: 'PUT',
@@ -337,10 +457,11 @@ const WorkflowBuilder = () => {
       } else {
         const created = await api<{ id: string; is_active: boolean }>('/api/workflows', {
           method: 'POST',
-          body: { name: 'My Workflow', ...payload },
+          body: payload,
         });
         setWorkflowId(created.id);
         setIsActive(created.is_active ?? false);
+        setSearchParams({ id: created.id });
       }
       setSaveStatus('Saved!');
       setTimeout(() => setSaveStatus(null), 2000);
@@ -381,19 +502,27 @@ const WorkflowBuilder = () => {
         <div className="px-8 py-5 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
-              {/* <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-                <span className="text-white font-bold text-xl">⚡</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                  WarpFlow Builder
-                </h1>
-                <p className="text-xs text-slate-400 mt-0.5">Build intelligent automations</p>
-              </div> */}
               <img src="/warpflow-logo-small-cropped.png" alt="WarpFlow Logo" className="h-10 filter invert object-contain" />
+              <div className="w-px h-8 bg-slate-700" />
+              <input
+                type="text"
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+                className="bg-transparent text-lg font-semibold text-slate-200 border-none outline-none focus:ring-0 w-48 truncate placeholder-slate-500"
+                placeholder="Workflow name..."
+              />
             </div>
 
-            <div className="flex items-center gap-3 ml-8">
+            <div className="flex items-center gap-3 ml-4">
+              <button
+                onClick={() => setShowWorkflowSelector(true)}
+                disabled={isLoadingWorkflow}
+                className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 rounded-xl font-medium flex items-center gap-2 transition-all border border-slate-700/50 hover:border-slate-600 shadow-lg disabled:opacity-40"
+              >
+                {isLoadingWorkflow ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
+                Open
+              </button>
+
               <button
                 onClick={runWorkflow}
                 disabled={nodes.length === 0}
@@ -433,7 +562,11 @@ const WorkflowBuilder = () => {
                 </button>
               )}
 
-              <button className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 rounded-xl font-medium flex items-center gap-2 transition-all border border-slate-700/50 hover:border-slate-600 shadow-lg">
+              <button
+                onClick={exportWorkflow}
+                disabled={nodes.length === 0}
+                className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 disabled:opacity-40 text-slate-200 rounded-xl font-medium flex items-center gap-2 transition-all border border-slate-700/50 hover:border-slate-600 shadow-lg"
+              >
                 <Download className="w-4 h-4" />
                 Export
               </button>
@@ -882,6 +1015,16 @@ const WorkflowBuilder = () => {
           onClose={() => setShowExecuteModal(false)}
         />
       )}
+
+      {/* Workflow Selector Modal */}
+      <WorkflowSelector
+        isOpen={showWorkflowSelector}
+        onClose={() => setShowWorkflowSelector(false)}
+        onSelect={loadWorkflow}
+        onNew={newWorkflow}
+        onImport={importWorkflow}
+        currentWorkflowId={workflowId}
+      />
     </div>
   );
 };
