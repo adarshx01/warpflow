@@ -436,10 +436,11 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
                         payload = data.get("media", {}).get("payload", "")
                         if payload and elevenlabs_ws:
                             try:
-                                # Forward the audio payload directly to ElevenLabs
-                                # Twilio sends base64-encoded mulaw, ElevenLabs accepts it as-is
+                                # Convert Twilio mulaw 8kHz → PCM 16kHz for ElevenLabs
+                                pcm_audio = twilio_media_to_pcm(payload)
+                                pcm_b64 = base64.b64encode(pcm_audio).decode("ascii")
                                 audio_message = {
-                                    "user_audio_chunk": payload,
+                                    "user_audio_chunk": pcm_b64,
                                 }
                                 await elevenlabs_ws.send(json.dumps(audio_message))
                             except websockets.exceptions.ConnectionClosed:
@@ -481,11 +482,19 @@ async def websocket_bridge(websocket: WebSocket, session_id: str):
                             audio_b64 = data["audio_event"].get("audio_base_64")
 
                         if audio_b64 and stream_sid:
+                            # Convert ElevenLabs PCM 16kHz → mulaw 8kHz for Twilio
+                            try:
+                                pcm_audio = base64.b64decode(audio_b64)
+                                mulaw_b64 = pcm_to_twilio_media(pcm_audio)
+                            except Exception as conv_err:
+                                logger.warning("Audio conversion failed, forwarding raw: %s", conv_err)
+                                mulaw_b64 = audio_b64
+
                             twilio_msg = {
                                 "event": "media",
                                 "streamSid": stream_sid,
                                 "media": {
-                                    "payload": audio_b64,
+                                    "payload": mulaw_b64,
                                 },
                             }
                             await websocket.send_json(twilio_msg)
